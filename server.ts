@@ -820,12 +820,20 @@ wss.on("connection", (ws) => {
 });
 
 server.on("upgrade", (request, socket, head) => {
-  const pathname = new URL(request.url || "", `http://${request.headers.host}`).pathname;
-  if (pathname === "/api/brain/ws" || pathname === "/ws") {
-    wss.handleUpgrade(request, socket, head, (ws) => {
-      wss.emit("connection", ws, request);
-    });
-  } else {
+  try {
+    const pathname = (request.url || "").split("?")[0];
+    if (pathname === "/api/brain/ws" || pathname === "/ws") {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit("connection", ws, request);
+      });
+    } else {
+      // In development, do not destroy other upgrades to let Vite HMR work.
+      if (process.env.NODE_ENV === "production") {
+        socket.destroy();
+      }
+    }
+  } catch (err) {
+    console.error("Error in server upgrade handler:", err);
     socket.destroy();
   }
 });
