@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import { BrainContext } from "./BrainContext";
 import { LiveControl } from "./components/LiveControl";
 import { SceneSelector } from "./components/SceneSelector";
@@ -19,9 +19,22 @@ import {
   HelpCircle,
   Terminal,
   Activity,
+  Smartphone,
+  Copy,
+  Check,
 } from "lucide-react";
 
 export default function App() {
+  const [previewType, setPreviewType] = useState<"interactive" | "sketchfab">("interactive");
+  const [tiktokSubTab, setTiktokSubTab] = useState<"web" | "android">("web");
+  const [copiedText, setCopiedText] = useState<string | null>(null);
+
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedText(id);
+    setTimeout(() => setCopiedText(null), 2000);
+  };
+
   const {
     activeTab,
     setActiveTab,
@@ -178,17 +191,83 @@ export default function App() {
                 <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                   <div className="flex items-center gap-2">
                     <Bot className="w-4 h-4 text-cyan-400" />
-                    <span className="text-sm font-bold text-white">3D Avatar Miku (Preview)</span>
+                    <span className="text-sm font-bold text-white">Miku 3D Avatar</span>
                   </div>
 
-                  <span className="text-xs bg-cyan-950 text-cyan-300 border border-cyan-500/40 px-2.5 py-0.5 rounded-full font-bold">
-                    {emotion}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded-full font-bold">
+                      {emotion}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Embedded Overlay Window */}
+                {/* Subtitle tabs to toggle between Canvas render & Sketchfab Embed */}
+                <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
+                  <button
+                    onClick={() => setPreviewType("interactive")}
+                    className={`flex-1 py-1 rounded-md font-bold transition cursor-pointer text-center ${
+                      previewType === "interactive"
+                        ? "bg-slate-850 text-cyan-300 border border-cyan-500/30"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    Render Interactivo
+                  </button>
+                  <button
+                    onClick={() => setPreviewType("sketchfab")}
+                    className={`flex-1 py-1 rounded-md font-bold transition cursor-pointer text-center ${
+                      previewType === "sketchfab"
+                        ? "bg-slate-850 text-cyan-300 border border-cyan-500/30"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    Modelo Sketchfab 3D
+                  </button>
+                </div>
+
+                {/* Embedded Display Window */}
                 <div className="relative w-full h-64 sm:h-72 bg-slate-950 rounded-lg overflow-hidden border border-slate-800">
-                  <Overlay />
+                  {previewType === "interactive" ? (
+                    <Overlay />
+                  ) : (
+                    <div className="w-full h-full flex flex-col p-1">
+                      <iframe
+                        title="Miku"
+                        allowFullScreen
+                        allow="autoplay; fullscreen; xr-spatial-tracking"
+                        src="https://sketchfab.com/models/c6e868c0a00442419df5c4ab354378b2/embed?autostart=1"
+                        className="w-full h-full rounded-lg border-0"
+                      />
+                      <p className="text-center mt-1 text-[11px] text-slate-400 font-normal">
+                        <a
+                          href="https://sketchfab.com/3d-models/miku-c6e868c0a00442419df5c4ab354378b2"
+                          target="_blank"
+                          rel="nofollow"
+                          className="font-bold text-cyan-400 hover:underline"
+                        >
+                          Miku
+                        </a>{" "}
+                        by{" "}
+                        <a
+                          href="https://sketchfab.com/oscar3dmodel"
+                          target="_blank"
+                          rel="nofollow"
+                          className="font-bold text-cyan-400 hover:underline"
+                        >
+                          雨宮レン
+                        </a>{" "}
+                        on{" "}
+                        <a
+                          href="https://sketchfab.com"
+                          target="_blank"
+                          rel="nofollow"
+                          className="font-bold text-cyan-400 hover:underline"
+                        >
+                          Sketchfab
+                        </a>
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Speech Activity Monitor */}
@@ -270,43 +349,231 @@ export default function App() {
 
         {activeTab === "tiktok" && (
           <div className="max-w-3xl mx-auto space-y-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg space-y-4">
-              <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
-                <Music2 className="w-6 h-6 text-cyan-400" />
-                <div>
-                  <h2 className="text-lg font-bold text-white">Integración con TikTok LIVE API</h2>
-                  <p className="text-xs text-slate-400">
-                    Sincroniza los mensajes de tus espectadores de TikTok en tiempo real con Miku.
-                  </p>
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg space-y-5">
+              {/* Main title */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-3">
+                  <Music2 className="w-6 h-6 text-cyan-400" />
+                  <div>
+                    <h2 className="text-lg font-bold text-white">Integración de TikTok</h2>
+                    <p className="text-xs text-slate-400">
+                      Gestiona tu autenticación web o configura el SDK nativo para dispositivos Android.
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-4 text-xs text-slate-300">
-                <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-2">
-                  <p className="font-bold text-cyan-300">Pasos para conectar tu cuenta:</p>
-                  <ul className="list-disc list-inside space-y-1 text-slate-400">
-                    <li>Registra una aplicación en el portal de desarrolladores de TikTok.</li>
-                    <li>Configura tu Client Key y Client Secret en tus secretos de entorno o `.env`.</li>
-                    <li>Genera un código de autorización temporal para conectar el stream.</li>
-                  </ul>
-                </div>
+              {/* Subtabs for Web & Android SDK */}
+              <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-850 text-xs">
+                <button
+                  onClick={() => setTiktokSubTab("web")}
+                  className={`flex-1 py-2.5 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-2 ${
+                    tiktokSubTab === "web"
+                      ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <Tv className="w-3.5 h-3.5" />
+                  <span>Conexión Web (Login Kit)</span>
+                </button>
+                <button
+                  onClick={() => setTiktokSubTab("android")}
+                  className={`flex-1 py-2.5 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-2 ${
+                    tiktokSubTab === "android"
+                      ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <Smartphone className="w-3.5 h-3.5" />
+                  <span>Android Companion SDK</span>
+                </button>
+              </div>
 
-                <div className="p-4 bg-cyan-950/30 border border-cyan-500/30 rounded-lg flex items-center justify-between">
-                  <div>
-                    <span className="font-bold text-white text-sm block">Estado de Conexión TikTok</span>
-                    <span className="text-slate-400 text-xs">
-                      {tiktokConnected ? "Conectado a TikTok LIVE Room" : "Chat simulado en modo de demostración activo"}
+              {tiktokSubTab === "web" ? (
+                <div className="space-y-4 text-xs text-slate-300">
+                  <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-2">
+                    <p className="font-bold text-cyan-300">Pasos para conectar tu cuenta:</p>
+                    <ul className="list-disc list-inside space-y-1 text-slate-400">
+                      <li>Registra una aplicación en el portal de desarrolladores de TikTok.</li>
+                      <li>Configura tu Client Key y Client Secret en tus secretos de entorno o `.env`.</li>
+                      <li>Genera un código de autorización temporal para conectar el stream.</li>
+                    </ul>
+                  </div>
+
+                  <div className="p-4 bg-cyan-950/30 border border-cyan-500/30 rounded-lg flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-white text-sm block">Estado de Conexión TikTok</span>
+                      <span className="text-slate-400 text-xs">
+                        {tiktokConnected ? "Conectado a TikTok LIVE Room" : "Chat simulado en modo de demostración activo"}
+                      </span>
+                    </div>
+                    <span
+                      className={`px-3 py-1 rounded-full font-bold text-xs ${
+                        tiktokConnected ? "bg-emerald-500/20 text-emerald-400" : "bg-cyan-500/20 text-cyan-300"
+                      }`}
+                    >
+                      {tiktokConnected ? "● CONECTADO" : "MODO DEMO"}
                     </span>
                   </div>
-                  <span
-                    className={`px-3 py-1 rounded-full font-bold text-xs ${
-                      tiktokConnected ? "bg-emerald-500/20 text-emerald-400" : "bg-cyan-500/20 text-cyan-300"
-                    }`}
-                  >
-                    {tiktokConnected ? "● CONECTADO" : "MODO DEMO"}
-                  </span>
+
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                    <a
+                      href="/api/tiktok/login"
+                      className="flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-lg bg-black hover:bg-zinc-900 border border-zinc-800 text-white font-bold transition shadow-md cursor-pointer text-center text-xs"
+                    >
+                      <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                        <path d="M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-1V14c0 3.76-2.13 7.04-5.59 8.52-3.46 1.48-7.55.93-10.45-1.4C1.69 18.77.34 14.54 1.17 10.48c.84-4.07 4.19-7.24 8.28-7.91V6.6c-2.11.35-3.81 1.94-4.22 4.02-.49 2.46.78 4.97 3.06 5.86 2.27.89 4.96-.03 6.13-2.19.26-.49.38-1.04.38-1.6V.02z"/>
+                      </svg>
+                      <span>CONECTAR CON TIKTOK (LOGIN KIT)</span>
+                    </a>
+
+                    {tiktokConnected && (
+                      <a
+                        href="/api/tiktok/logout"
+                        className="flex items-center justify-center py-3 px-5 rounded-lg bg-red-950/40 text-red-400 hover:bg-red-900/30 border border-red-500/20 font-bold transition text-xs cursor-pointer text-center"
+                      >
+                        DESCONECTAR CUENTA
+                      </a>
+                    )}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-5 text-xs text-slate-300 animate-fadeIn">
+                  {/* Android Quickstart Header */}
+                  <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <span className="font-bold text-cyan-300 text-sm">TikTok OpenSDK para Android</span>
+                      <a
+                        href="https://github.com/tiktok/tiktok-opensdk-android.git"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-cyan-400 hover:underline flex items-center gap-1 font-semibold self-start"
+                      >
+                        Ver Repositorio GitHub <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                    <p className="text-slate-400 leading-relaxed">
+                      El SDK nativo de TikTok te permite integrar funcionalidades de Login y compartir contenido en tu aplicación de Android (API 21 o posterior).
+                    </p>
+                  </div>
+
+                  {/* Step 1: App Settings & Fingerprints */}
+                  <div className="space-y-3">
+                    <p className="font-bold text-white text-sm flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-slate-800 text-cyan-400 flex items-center justify-center font-mono text-[11px]">1</span>
+                      Configuración de Firma de la App
+                    </p>
+                    <p className="text-slate-400 pl-6 leading-relaxed">
+                      Deberás registrar las huellas digitales MD5 y SHA-256 en el portal de desarrolladores de TikTok. En el campo de firma de TikTok, elimina los dos puntos (:) de tu cadena MD5 para obtener una cadena de 32 caracteres.
+                    </p>
+
+                    <div className="pl-6 space-y-3">
+                      <div className="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                        <div className="bg-slate-900/60 border-b border-slate-800 px-3.5 py-2 flex items-center justify-between">
+                          <span className="font-mono text-[10px] text-slate-400">Usando Keytool</span>
+                          <button
+                            onClick={() => handleCopy("keytool -list -v -alias <your-key-name> -keystore <path-to-production-keystore>", "keytool")}
+                            className="text-slate-400 hover:text-white flex items-center gap-1 font-semibold cursor-pointer"
+                          >
+                            {copiedText === "keytool" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            <span>{copiedText === "keytool" ? "Copiado" : "Copiar"}</span>
+                          </button>
+                        </div>
+                        <pre className="p-3 font-mono text-[11px] text-slate-300 overflow-x-auto bg-slate-950 whitespace-pre-wrap">
+                          {`keytool -list -v -alias <your-key-name> -keystore <path-to-production-keystore>`}
+                        </pre>
+                      </div>
+
+                      <div className="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                        <div className="bg-slate-900/60 border-b border-slate-800 px-3.5 py-2 flex items-center justify-between">
+                          <span className="font-mono text-[10px] text-slate-400">Usando Reporte de Gradle</span>
+                          <button
+                            onClick={() => handleCopy("./gradlew signingReport", "gradlew")}
+                            className="text-slate-400 hover:text-white flex items-center gap-1 font-semibold cursor-pointer"
+                          >
+                            {copiedText === "gradlew" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            <span>{copiedText === "gradlew" ? "Copiado" : "Copiar"}</span>
+                          </button>
+                        </div>
+                        <pre className="p-3 font-mono text-[11px] text-slate-300 overflow-x-auto bg-slate-950">
+                          {`./gradlew signingReport`}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Step 2: Repositories & Dependencies */}
+                  <div className="space-y-3">
+                    <p className="font-bold text-white text-sm flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-slate-800 text-cyan-400 flex items-center justify-center font-mono text-[11px]">2</span>
+                      Instalación del SDK (build.gradle)
+                    </p>
+                    
+                    <div className="pl-6 space-y-3">
+                      <div className="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                        <div className="bg-slate-900/60 border-b border-slate-800 px-3.5 py-2 flex items-center justify-between">
+                          <span className="font-mono text-[10px] text-slate-400">build.gradle (Proyecto - repositories)</span>
+                          <button
+                            onClick={() => handleCopy('repositories {\n    maven { url "https://artifact.bytedance.com/repository/AwemeOpenSDK" }\n}', "repo")}
+                            className="text-slate-400 hover:text-white flex items-center gap-1 font-semibold cursor-pointer"
+                          >
+                            {copiedText === "repo" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            <span>{copiedText === "repo" ? "Copiado" : "Copiar"}</span>
+                          </button>
+                        </div>
+                        <pre className="p-3 font-mono text-[11px] text-slate-300 overflow-x-auto bg-slate-950">
+                          {`repositories {\n    maven { url "https://artifact.bytedance.com/repository/AwemeOpenSDK" }\n}`}
+                        </pre>
+                      </div>
+
+                      <div className="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                        <div className="bg-slate-900/60 border-b border-slate-800 px-3.5 py-2 flex items-center justify-between">
+                          <span className="font-mono text-[10px] text-slate-400">build.gradle (Módulo: app - dependencies)</span>
+                          <button
+                            onClick={() => handleCopy("dependencies {\n    implementation 'com.tiktok.open.sdk:tiktok-open-sdk-core:latest.release'\n    implementation 'com.tiktok.open.sdk:tiktok-open-sdk-auth:latest.release'\n    implementation 'com.tiktok.open.sdk:tiktok-open-sdk-share:latest.release'\n}", "dep")}
+                            className="text-slate-400 hover:text-white flex items-center gap-1 font-semibold cursor-pointer"
+                          >
+                            {copiedText === "dep" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            <span>{copiedText === "dep" ? "Copiado" : "Copiar"}</span>
+                          </button>
+                        </div>
+                        <pre className="p-3 font-mono text-[11px] text-slate-300 overflow-x-auto bg-slate-950">
+                          {`dependencies {\n    implementation 'com.tiktok.open.sdk:tiktok-open-sdk-core:latest.release'\n    implementation 'com.tiktok.open.sdk:tiktok-open-sdk-auth:latest.release'\n    implementation 'com.tiktok.open.sdk:tiktok-open-sdk-share:latest.release'\n}`}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Step 3: Manifest queries for Android 11+ */}
+                  <div className="space-y-3">
+                    <p className="font-bold text-white text-sm flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-slate-800 text-cyan-400 flex items-center justify-center font-mono text-[11px]">3</span>
+                      Visibilidad del Paquete (Android 11+)
+                    </p>
+                    <p className="text-slate-400 pl-6 leading-relaxed">
+                      Debido a las políticas de visibilidad de paquetes en Android 11 y posteriores, debes añadir los siguientes paquetes en tu archivo <code className="text-cyan-300 bg-slate-950 px-1 py-0.5 rounded border border-slate-800 font-mono text-[11px]">AndroidManifest.xml</code>:
+                    </p>
+
+                    <div className="pl-6">
+                      <div className="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                        <div className="bg-slate-900/60 border-b border-slate-800 px-3.5 py-2 flex items-center justify-between">
+                          <span className="font-mono text-[10px] text-slate-400">AndroidManifest.xml</span>
+                          <button
+                            onClick={() => handleCopy('<queries>\n    <package android:name="com.zhiliaoapp.musically" />\n    <package android:name="com.ss.android.ugc.trill" />\n</queries>', "manifest")}
+                            className="text-slate-400 hover:text-white flex items-center gap-1 font-semibold cursor-pointer"
+                          >
+                            {copiedText === "manifest" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            <span>{copiedText === "manifest" ? "Copiado" : "Copiar"}</span>
+                          </button>
+                        </div>
+                        <pre className="p-3 font-mono text-[11px] text-slate-300 overflow-x-auto bg-slate-950">
+                          {`<queries>\n    <package android:name="com.zhiliaoapp.musically" />\n    <package android:name="com.ss.android.ugc.trill" />\n</queries>`}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

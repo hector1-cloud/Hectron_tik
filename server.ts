@@ -168,9 +168,34 @@ app.delete("/api/logs", (_req, res) => {
 app.use(express.static(path.join(process.cwd(), "public")));
 
 // TikTok Developers Site Verification
+app.get("/tiktoktICxue0oKGXMURxd6T2UMQSoI7cNCnoB*", (req, res) => {
+  res.type("text/plain");
+  res.send("tiktoktICxue0oKGXMURxd6T2UMQSoI7cNCnoB");
+});
+
+app.get("/tiktoktnauWvNcdAEhW0CTm3RtYvMjfCppNjfz*", (req, res) => {
+  res.type("text/plain");
+  res.send("tiktoktnauWvNcdAEhW0CTm3RtYvMjfCppNjfz");
+});
+
+app.get("/tiktokXn4xkCxcrGXQ1Xnq0kD0w9ZnmUbHy6mw*", (req, res) => {
+  res.type("text/plain");
+  res.send("tiktokXn4xkCxcrGXQ1Xnq0kD0w9ZnmUbHy6mw");
+});
+
+app.get("/tiktokpG8kKkBFdtSrRC63gPsuGnJVyHtyw7D5*", (req, res) => {
+  res.type("text/plain");
+  res.send("tiktokpG8kKkBFdtSrRC63gPsuGnJVyHtyw7D5");
+});
+
 app.get("/tiktok-developers-site-verification=tICxue0oKGXMURxd6T2UMQSoI7cNCnoB*", (req, res) => {
   res.type("text/plain");
   res.send("tiktok-developers-site-verification=tICxue0oKGXMURxd6T2UMQSoI7cNCnoB");
+});
+
+app.get("/tiktok-developers-site-verification=tnauWvNcdAEhW0CTm3RtYvMjfCppNjfz*", (req, res) => {
+  res.type("text/plain");
+  res.send("tiktok-developers-site-verification=tnauWvNcdAEhW0CTm3RtYvMjfCppNjfz");
 });
 
 app.get("/tiktok-developers-site-verification=Xn4xkCxcrGXQ1Xnq0kD0w9ZnmUbHy6mw*", (req, res) => {
@@ -196,6 +221,11 @@ app.get("/tiktok-developers-site-verification*", (req, res) => {
 app.get("/tICxue0oKGXMURxd6T2UMQSoI7cNCnoB*", (req, res) => {
   res.type("text/plain");
   res.send("tiktok-developers-site-verification=tICxue0oKGXMURxd6T2UMQSoI7cNCnoB");
+});
+
+app.get("/tnauWvNcdAEhW0CTm3RtYvMjfCppNjfz*", (req, res) => {
+  res.type("text/plain");
+  res.send("tiktok-developers-site-verification=tnauWvNcdAEhW0CTm3RtYvMjfCppNjfz");
 });
 
 app.get("/Xn4xkCxcrGXQ1Xnq0kD0w9ZnmUbHy6mw*", (req, res) => {
@@ -359,7 +389,7 @@ INSTRUCCIONES CRÍTICAS:
 
       try {
         const geminiRes = await ai.models.generateContent({
-          model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+          model: process.env.GEMINI_MODEL || "gemini-3.6-flash",
           contents: prompt,
           config: {
             temperature: 0.9,
@@ -434,7 +464,7 @@ En español, máximo 20 palabras, con emojis cian/azules. Devuelve JSON:
 `;
       try {
         const geminiRes = await ai.models.generateContent({
-          model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+          model: process.env.GEMINI_MODEL || "gemini-3.6-flash",
           contents: prompt,
           config: { responseMimeType: "application/json" },
         });
@@ -469,13 +499,105 @@ app.get("/api/brain/state", (_req, res) => {
   res.json(brainState);
 });
 
-// 6. TikTok Init route
-app.post("/api/tiktok/init", (req, res) => {
+// Terms and Privacy endpoints for extensionless URLs
+app.get("/terms", (_req, res) => {
+  res.sendFile(path.join(process.cwd(), "public", "terms.html"));
+});
+
+app.get("/terms-of-service", (_req, res) => {
+  res.sendFile(path.join(process.cwd(), "public", "terms-of-service.html"));
+});
+
+app.get("/privacy", (_req, res) => {
+  res.sendFile(path.join(process.cwd(), "public", "privacy.html"));
+});
+
+app.get("/privacy-policy", (_req, res) => {
+  res.sendFile(path.join(process.cwd(), "public", "privacy-policy.html"));
+});
+
+// 6. TikTok Login & Init routes
+app.get("/api/tiktok/login", (req, res) => {
+  const clientKey = process.env.TIKTOK_CLIENT_KEY || "";
+  const redirectUri = `${req.protocol}://${req.get("host")}/api/tiktok/callback`;
+  
+  // State token for anti-CSRF protection
+  const state = Math.random().toString(36).substring(2, 15);
+  
+  const authUrl = new URL("https://www.tiktok.com/v2/auth/authorize/");
+  authUrl.searchParams.append("client_key", clientKey);
+  authUrl.searchParams.append("scope", "user.info.basic");
+  authUrl.searchParams.append("response_type", "code");
+  authUrl.searchParams.append("redirect_uri", redirectUri);
+  authUrl.searchParams.append("state", state);
+
+  addServerLog("INFO", "TIKTOK", "Redirecting user to TikTok OAuth consent page", {
+    clientKey: clientKey ? `${clientKey.substring(0, 6)}...` : "not set",
+    redirectUri,
+    state
+  });
+
+  res.redirect(authUrl.toString());
+});
+
+app.get("/api/tiktok/logout", (req, res) => {
+  brainState.tiktokConnected = false;
+  brainState.accessToken = "";
+  brainState.roomId = "";
+  addServerLog("INFO", "TIKTOK", "TikTok account disconnected by user");
+  broadcast({
+    type: "tiktok_disconnected"
+  });
+  res.redirect("/?tiktok_logout=true");
+});
+
+app.post("/api/tiktok/init", async (req, res) => {
   const { code } = req.body;
   if (!code) {
     addServerLog("WARN", "TIKTOK", "TikTok init missing auth code");
     return res.status(400).json({ error: "Code is required" });
   }
+
+  const clientKey = process.env.TIKTOK_CLIENT_KEY || "";
+  const clientSecret = process.env.TIKTOK_CLIENT_SECRET || "";
+  let accessToken = String(code);
+  let openId = "";
+  let realExchangeSuccess = false;
+
+  if (clientKey && clientSecret) {
+    try {
+      addServerLog("INFO", "TIKTOK", "Exchanging code for official TikTok access token inside /api/tiktok/init...");
+      const redirectUri = `${req.protocol}://${req.get("host")}/api/tiktok/callback`;
+      const bodyParams = new URLSearchParams();
+      bodyParams.append("client_key", clientKey);
+      bodyParams.append("client_secret", clientSecret);
+      bodyParams.append("code", String(code));
+      bodyParams.append("grant_type", "authorization_code");
+      bodyParams.append("redirect_uri", redirectUri);
+
+      const response = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Cache-Control": "no-cache"
+        },
+        body: bodyParams.toString()
+      });
+
+      const responseData = await response.json() as any;
+      if (response.ok && responseData && !responseData.error && responseData.access_token) {
+        accessToken = responseData.access_token;
+        openId = responseData.open_id || "";
+        realExchangeSuccess = true;
+        addServerLog("INFO", "TIKTOK", "Official TikTok access token obtained inside /api/tiktok/init", { openId });
+      } else {
+        addServerLog("ERROR", "TIKTOK", "TikTok init token exchange failed. Falling back to code as simulated token.", responseData);
+      }
+    } catch (fetchErr: any) {
+      addServerLog("ERROR", "TIKTOK", "Network error during TikTok token exchange in /api/tiktok/init", { error: fetchErr?.message });
+    }
+  }
+
   brainState.tiktokConnected = true;
   brainState.roomId = `room_${Math.floor(Math.random() * 1000000)}`;
 
@@ -484,13 +606,163 @@ app.post("/api/tiktok/init", (req, res) => {
   broadcast({
     type: "tiktok_connected",
     roomId: brainState.roomId,
+    realExchangeSuccess,
+    openId
   });
 
   res.json({
     ok: true,
     message: "TikTok LIVE conectado con éxito",
     roomId: brainState.roomId,
+    realExchangeSuccess,
+    openId
   });
+});
+
+// 7. TikTok OAuth Callback (URL de devolución de llamada)
+app.get("/api/tiktok/callback", async (req, res) => {
+  const { code, state, error, error_description } = req.query;
+
+  if (error) {
+    addServerLog("ERROR", "TIKTOK", `TikTok OAuth login error: ${error}`, { error_description });
+    return res.redirect(`/?tiktok_error=${encodeURIComponent(String(error_description || error))}`);
+  }
+
+  if (!code) {
+    addServerLog("WARN", "TIKTOK", "TikTok Callback triggered without auth code");
+    return res.redirect("/?tiktok_error=missing_code");
+  }
+
+  addServerLog("INFO", "TIKTOK", "TikTok login callback received authorization code successfully", { code, state });
+  
+  const clientKey = process.env.TIKTOK_CLIENT_KEY || "";
+  const clientSecret = process.env.TIKTOK_CLIENT_SECRET || "";
+  let accessToken = String(code);
+  let openId = "";
+  let realExchangeSuccess = false;
+
+  if (clientKey && clientSecret) {
+    try {
+      addServerLog("INFO", "TIKTOK", "Exchanging code for official TikTok access token...");
+      const redirectUri = `${req.protocol}://${req.get("host")}/api/tiktok/callback`;
+      const bodyParams = new URLSearchParams();
+      bodyParams.append("client_key", clientKey);
+      bodyParams.append("client_secret", clientSecret);
+      bodyParams.append("code", String(code));
+      bodyParams.append("grant_type", "authorization_code");
+      bodyParams.append("redirect_uri", redirectUri);
+
+      const response = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Cache-Control": "no-cache"
+        },
+        body: bodyParams.toString()
+      });
+
+      const responseData = await response.json() as any;
+      if (response.ok && responseData && !responseData.error && responseData.access_token) {
+        accessToken = responseData.access_token;
+        openId = responseData.open_id || "";
+        realExchangeSuccess = true;
+        addServerLog("INFO", "TIKTOK", "Official TikTok access token obtained successfully", { openId });
+      } else {
+        addServerLog("ERROR", "TIKTOK", "TikTok API token exchange failed, falling back to code as simulated token.", responseData);
+      }
+    } catch (fetchErr: any) {
+      addServerLog("ERROR", "TIKTOK", "Network error during TikTok token exchange", { error: fetchErr?.message });
+    }
+  } else {
+    addServerLog("INFO", "TIKTOK", "TikTok credentials not configured. Operating in developer simulation mode.");
+  }
+
+  // Update state
+  brainState.tiktokConnected = true;
+  brainState.accessToken = accessToken;
+  brainState.roomId = `room_${Math.floor(Math.random() * 900000 + 100000)}`;
+
+  broadcast({
+    type: "tiktok_connected",
+    roomId: brainState.roomId,
+    realExchangeSuccess,
+    openId
+  });
+
+  // Redirect back to app home with success flag
+  res.redirect("/?tiktok_success=true");
+});
+
+// 8. TikTok Webhook Endpoint (Webhooks Receiver)
+app.post("/api/tiktok/webhook", (req, res) => {
+  const payload = req.body;
+  
+  addServerLog("INFO", "TIKTOK", "Received TikTok webhook notification", payload);
+
+  // Handle TikTok URL Verification/Challenge if present
+  // TikTok verification uses a body challenge or header challenge. Usually we echo back the challenge.
+  if (payload && payload.challenge) {
+    addServerLog("INFO", "TIKTOK", "TikTok Webhook challenge verified", { challenge: payload.challenge });
+    return res.json({ challenge: payload.challenge });
+  }
+
+  // Handle various TikTok Live/User Event types
+  const eventType = payload?.event || "unknown";
+  const eventData = payload?.data || {};
+
+  switch (eventType) {
+    case "live.comment": {
+      const commentUser = eventData.username || "Fan";
+      const commentText = eventData.text || "";
+      addServerLog("INFO", "TIKTOK", `Live Comment from ${commentUser}: "${commentText}"`);
+      broadcast({
+        type: "tiktok_comment",
+        user: commentUser,
+        text: commentText,
+        timestamp: new Date().toISOString()
+      });
+      break;
+    }
+    case "live.gift": {
+      const giftUser = eventData.username || "Fan";
+      const giftName = eventData.gift_name || "Gift";
+      const giftCount = eventData.count || 1;
+      addServerLog("INFO", "TIKTOK", `Live Gift from ${giftUser}: ${giftCount}x ${giftName}`);
+      broadcast({
+        type: "tiktok_gift",
+        user: giftUser,
+        giftName,
+        count: giftCount,
+        timestamp: new Date().toISOString()
+      });
+      break;
+    }
+    case "live.follow": {
+      const follower = eventData.username || "Fan";
+      addServerLog("INFO", "TIKTOK", `New Live Follower: ${follower}`);
+      broadcast({
+        type: "tiktok_follow",
+        user: follower,
+        timestamp: new Date().toISOString()
+      });
+      break;
+    }
+    default:
+      addServerLog("DEBUG", "TIKTOK", `TikTok event ignored or unhandled: ${eventType}`);
+  }
+
+  // Always return a 200 OK to TikTok to acknowledge receipt
+  res.status(200).json({ ok: true });
+});
+
+// TikTok Webhook Verification GET support (for manual verification checks if needed)
+app.get("/api/tiktok/webhook", (req, res) => {
+  const { challenge } = req.query;
+  if (challenge) {
+    addServerLog("INFO", "TIKTOK", "TikTok Webhook verification challenge received via GET query", { challenge });
+    return res.send(challenge);
+  }
+  res.status(200).json({ status: "TikTok Webhook receiver active and listening" });
 });
 
 // Create HTTP server
