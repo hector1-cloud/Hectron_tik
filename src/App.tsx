@@ -479,7 +479,7 @@ export default function App() {
                             <span>{copiedText === "keytool" ? "Copiado" : "Copiar"}</span>
                           </button>
                         </div>
-                        <pre className="p-3 font-mono text-[11px] text-slate-300 overflow-x-auto bg-slate-950 whitespace-pre-wrap">
+                        <pre className="notranslate p-3 font-mono text-[11px] text-slate-300 overflow-x-auto bg-slate-950 whitespace-pre-wrap" translate="no">
                           {`keytool -list -v -alias <your-key-name> -keystore <path-to-production-keystore>`}
                         </pre>
                       </div>
@@ -495,7 +495,7 @@ export default function App() {
                             <span>{copiedText === "gradlew" ? "Copiado" : "Copiar"}</span>
                           </button>
                         </div>
-                        <pre className="p-3 font-mono text-[11px] text-slate-300 overflow-x-auto bg-slate-950">
+                        <pre className="notranslate p-3 font-mono text-[11px] text-slate-300 overflow-x-auto bg-slate-950" translate="no">
                           {`./gradlew signingReport`}
                         </pre>
                       </div>
@@ -521,7 +521,7 @@ export default function App() {
                             <span>{copiedText === "repo" ? "Copiado" : "Copiar"}</span>
                           </button>
                         </div>
-                        <pre className="p-3 font-mono text-[11px] text-slate-300 overflow-x-auto bg-slate-950">
+                        <pre className="notranslate p-3 font-mono text-[11px] text-slate-300 overflow-x-auto bg-slate-950" translate="no">
                           {`repositories {\n    maven { url "https://artifact.bytedance.com/repository/AwemeOpenSDK" }\n}`}
                         </pre>
                       </div>
@@ -537,7 +537,7 @@ export default function App() {
                             <span>{copiedText === "dep" ? "Copiado" : "Copiar"}</span>
                           </button>
                         </div>
-                        <pre className="p-3 font-mono text-[11px] text-slate-300 overflow-x-auto bg-slate-950">
+                        <pre className="notranslate p-3 font-mono text-[11px] text-slate-300 overflow-x-auto bg-slate-950" translate="no">
                           {`dependencies {\n    implementation 'com.tiktok.open.sdk:tiktok-open-sdk-core:latest.release'\n    implementation 'com.tiktok.open.sdk:tiktok-open-sdk-auth:latest.release'\n    implementation 'com.tiktok.open.sdk:tiktok-open-sdk-share:latest.release'\n}`}
                         </pre>
                       </div>
@@ -551,7 +551,7 @@ export default function App() {
                       Visibilidad del Paquete (Android 11+)
                     </p>
                     <p className="text-slate-400 pl-6 leading-relaxed">
-                      Debido a las políticas de visibilidad de paquetes en Android 11 y posteriores, debes añadir los siguientes paquetes en tu archivo <code className="text-cyan-300 bg-slate-950 px-1 py-0.5 rounded border border-slate-800 font-mono text-[11px]">AndroidManifest.xml</code>:
+                      Debido a las políticas de visibilidad de paquetes en Android 11 y posteriores, debes añadir los siguientes paquetes en tu archivo <code className="notranslate text-cyan-300 bg-slate-950 px-1 py-0.5 rounded border border-slate-800 font-mono text-[11px]" translate="no">AndroidManifest.xml</code>:
                     </p>
 
                     <div className="pl-6">
@@ -566,7 +566,7 @@ export default function App() {
                             <span>{copiedText === "manifest" ? "Copiado" : "Copiar"}</span>
                           </button>
                         </div>
-                        <pre className="p-3 font-mono text-[11px] text-slate-300 overflow-x-auto bg-slate-950">
+                        <pre className="notranslate p-3 font-mono text-[11px] text-slate-300 overflow-x-auto bg-slate-950" translate="no">
                           {`<queries>\n    <package android:name="com.zhiliaoapp.musically" />\n    <package android:name="com.ss.android.ugc.trill" />\n</queries>`}
                         </pre>
                       </div>
