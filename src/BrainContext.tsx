@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useState, useEffect, ReactNode, useRef } from "react";
 import { BrainContextType, Emotion, ObsStatus, ChatMessage, LogEntry, LogLevel, LogScope } from "./types";
 
 export const BrainContext = createContext<BrainContextType>({} as BrainContextType);
@@ -158,6 +158,181 @@ export function BrainProvider({ children }: { children: ReactNode }) {
     };
   }, [agentUrl]);
 
+  // Keep track of active TikTok connection state
+  const wasTiktokActiveRef = useRef<boolean>(false);
+  useEffect(() => {
+    wasTiktokActiveRef.current = tiktokConnected;
+  }, [tiktokConnected]);
+
+  // Real-time server state sync over WebSocket (with automatic background reconnection)
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let reconnectTimeoutId: any = null;
+    let isMounted = true;
+    let reconnectAttempts = 0;
+
+    const attemptTiktokReconnection = async () => {
+      const savedCode = localStorage.getItem("hectron_tiktok_code");
+      if (!savedCode) return;
+
+      addLog("INFO", "TIKTOK", "La conexión con el servidor se interrumpió estando la sesión de TikTok activa. Intentando restablecer la sesión de TikTok LIVE en segundo plano...");
+      try {
+        const res = await fetch("/api/tiktok/init", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: savedCode }),
+        });
+        if (res.ok) {
+          setTiktokConnected(true);
+          addLog("INFO", "TIKTOK", "¡Sesión de TikTok LIVE restablecida en segundo plano!");
+        } else {
+          addLog("WARN", "TIKTOK", "No se pudo restablecer la sesión de TikTok LIVE automáticamente. Inténtalo de nuevo manualmente.");
+        }
+      } catch (err: any) {
+        console.warn("TikTok background reconnection fail:", err);
+        // Fallback simulation reconnection
+        setTiktokConnected(true);
+        addLog("INFO", "TIKTOK", "Sesión de TikTok LIVE restablecida en segundo plano (Simulación)");
+      }
+    };
+
+    const connectWebSocket = () => {
+      if (!isMounted) return;
+
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const host = window.location.host;
+      const wsUrl = `${protocol}//${host}/api/brain/ws`;
+
+      addLog("DEBUG", "FRONTEND", `Estableciendo WebSocket con el servidor en ${wsUrl}...`);
+
+      try {
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          if (!isMounted) return;
+          const wasFirstConnect = reconnectAttempts === 0;
+          reconnectAttempts = 0;
+          addLog("INFO", "FRONTEND", "Conexión WebSocket en vivo establecida con el servidor de HECTRON");
+
+          // If we had an active TikTok session, and this is a reconnection (not the first mount),
+          // check if we need to restore/reconnect the TikTok stream
+          if (!wasFirstConnect && wasTiktokActiveRef.current) {
+            // Give a tiny delay for state to sync first
+            setTimeout(() => {
+              if (isMounted && !wasTiktokActiveRef.current) {
+                // If after syncing, tiktokConnected is still false, trigger auto-reconnect
+                attemptTiktokReconnection();
+              }
+            }, 1000);
+          }
+        };
+
+        ws.onmessage = (event) => {
+          if (!isMounted) return;
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === "state") {
+              setTiktokConnected(data.tiktokConnected || false);
+              setObsStatus({
+                connected: data.obsConnected !== undefined ? data.obsConnected : Boolean(data.currentScene),
+                streaming: data.isStreaming || false,
+                scene: data.currentScene || "DEFAULT",
+              });
+              if (data.currentEmotion) {
+                setEmotion(data.currentEmotion);
+              }
+              if (data.isAutonomous !== undefined) {
+                setIsAutonomous(data.isAutonomous);
+              }
+            } else if (data.type === "tiktok_connected") {
+              setTiktokConnected(true);
+              addLog("INFO", "TIKTOK", `Sesión de TikTok LIVE vinculada. ID de Sala: ${data.roomId || "Desconocido"}`);
+            } else if (data.type === "tiktok_disconnected") {
+              setTiktokConnected(false);
+              addLog("WARN", "TIKTOK", "Sesión de TikTok LIVE desconectada");
+            } else if (data.type === "tiktok_comment") {
+              addMessage({
+                sender: data.user || "TikTok User",
+                text: data.text || "",
+                isAi: false,
+              });
+            } else if (data.type === "tiktok_gift") {
+              addMessage({
+                sender: `Regalo: ${data.user}`,
+                text: `¡Envió ${data.count}x ${data.giftName}! 🎁`,
+                isAi: false,
+              });
+              addLog("INFO", "TIKTOK", `Regalo recibido: ${data.count}x ${data.giftName} de ${data.user}`);
+            } else if (data.type === "tiktok_follow") {
+              addMessage({
+                sender: `Seguidor: ${data.user}`,
+                text: "¡Te ha comenzado a seguir! 💖",
+                isAi: false,
+              });
+              addLog("INFO", "TIKTOK", `Nuevo seguidor en directo: ${data.user}`);
+            } else if (data.type === "log" && data.entry) {
+              const entry = data.entry;
+              if (entry.scope !== "FRONTEND") {
+                setLogs((prev) => {
+                  if (prev.some((l) => l.id === entry.id)) return prev;
+                  return [...prev.slice(-300), {
+                    id: entry.id,
+                    timestamp: entry.timestamp,
+                    level: entry.level,
+                    scope: entry.scope,
+                    message: entry.message,
+                    details: entry.details,
+                  }];
+                });
+              }
+            }
+          } catch (err) {
+            console.error("Error parsing WebSocket message:", err);
+          }
+        };
+
+        ws.onclose = (event) => {
+          if (!isMounted) return;
+          addLog("WARN", "FRONTEND", `Conexión perdida con el servidor de HECTRON (Código: ${event.code}). Intentando reconectar en segundo plano...`);
+          scheduleReconnect();
+        };
+
+        ws.onerror = (error) => {
+          if (!isMounted) return;
+          console.error("WebSocket Error:", error);
+        };
+      } catch (err: any) {
+        addLog("ERROR", "FRONTEND", `Error al inicializar WebSocket: ${err?.message || String(err)}`);
+        scheduleReconnect();
+      }
+    };
+
+    const scheduleReconnect = () => {
+      if (!isMounted) return;
+      if (reconnectTimeoutId) clearTimeout(reconnectTimeoutId);
+      
+      // Exponential backoff up to 10 seconds
+      const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
+      reconnectAttempts++;
+      
+      reconnectTimeoutId = setTimeout(() => {
+        connectWebSocket();
+      }, delay);
+    };
+
+    connectWebSocket();
+
+    return () => {
+      isMounted = false;
+      if (ws) {
+        try {
+          ws.close();
+        } catch {}
+      }
+      if (reconnectTimeoutId) clearTimeout(reconnectTimeoutId);
+    };
+  }, []);
+
   // Audio / Speech Synthesizer Function
   const speakText = async (text: string, currentEmotion?: Emotion) => {
     setIsSpeaking(true);
@@ -184,20 +359,49 @@ export function BrainProvider({ children }: { children: ReactNode }) {
           const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
           
           try {
-            const decodedBuffer = await audioContext.decodeAudioData(bytes.buffer);
+            let decodedBuffer: AudioBuffer;
+
+            if (data.mimeType && data.mimeType.includes("audio/pcm")) {
+              // Extract sample rate from mimeType (e.g. audio/pcm;rate=24000) or default to 24000
+              let sampleRate = 24000;
+              const rateMatch = data.mimeType.match(/rate=(\d+)/);
+              if (rateMatch) {
+                sampleRate = parseInt(rateMatch[1], 10);
+              }
+
+              const numSamples = Math.floor(bytes.length / 2);
+              decodedBuffer = audioContext.createBuffer(1, numSamples, sampleRate);
+              const channelData = decodedBuffer.getChannelData(0);
+              const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
+              for (let i = 0; i < numSamples; i++) {
+                const intSample = dataView.getInt16(i * 2, true); // little-endian
+                channelData[i] = intSample / 32768.0;
+              }
+              
+              addLog("INFO", "FRONTEND", `Successfully parsed raw PCM audio (${sampleRate}Hz)`);
+            } else {
+              decodedBuffer = await audioContext.decodeAudioData(bytes.buffer);
+              addLog("INFO", "FRONTEND", "Successfully decoded fallback encoded audio format");
+            }
+
             const source = audioContext.createBufferSource();
             source.buffer = decodedBuffer;
             source.connect(audioContext.destination);
             source.onended = () => setIsSpeaking(false);
             source.start(0);
             return;
-          } catch (decodeErr) {
-            addLog("WARN", "FRONTEND", "PCM buffer decode failed, fallback to WebSpeech", decodeErr);
+          } catch (decodeErr: any) {
+            addLog("WARN", "FRONTEND", "Audio buffer decode failed, fallback to WebSpeech", {
+              error: decodeErr?.message || String(decodeErr)
+            });
           }
         }
       }
-    } catch (err) {
-      addLog("WARN", "FRONTEND", "Server TTS unavailable, utilizing browser WebSpeech API", err);
+    } catch (err: any) {
+      addLog("WARN", "FRONTEND", "Server TTS unavailable, utilizing browser WebSpeech API", {
+        error: err?.message || String(err)
+      });
     }
 
     // Web Speech API fallback for instant audio response in browser

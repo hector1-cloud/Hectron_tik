@@ -28,6 +28,18 @@ const ai = apiKey
     })
   : null;
 
+// Helper to safely get sanitized Gemini model name from environment
+function getGeminiModel(): string {
+  let model = (process.env.GEMINI_MODEL || "gemini-3.6-flash").trim();
+  if (model.startsWith("models/")) {
+    model = model.substring("models/".length);
+  }
+  if (model === "MY_GEMINI_MODEL" || model === "" || model === "undefined" || model === "null") {
+    return "gemini-3.6-flash";
+  }
+  return model;
+}
+
 // In-memory Log Store with Rotation (max 500 entries)
 interface LogEntryServer {
   id: string;
@@ -399,7 +411,7 @@ INSTRUCCIONES CRÍTICAS:
 
       try {
         const geminiRes = await ai.models.generateContent({
-          model: process.env.GEMINI_MODEL || "gemini-3.6-flash",
+          model: getGeminiModel(),
           contents: prompt,
           config: {
             temperature: 0.9,
@@ -474,7 +486,7 @@ En español, máximo 20 palabras, con emojis cian/azules. Devuelve JSON:
 `;
       try {
         const geminiRes = await ai.models.generateContent({
-          model: process.env.GEMINI_MODEL || "gemini-3.6-flash",
+          model: getGeminiModel(),
           contents: prompt,
           config: { responseMimeType: "application/json" },
         });
@@ -527,9 +539,28 @@ app.get("/privacy-policy", (_req, res) => {
 });
 
 // 6. TikTok Login & Init routes
+// Helper to get correct TikTok Credentials from environment with fallback values
+function getTiktokCredentials() {
+  return {
+    clientKey: process.env.TIKTOK_CLIENT_KEY || "awvckv5za3nclqpe",
+    clientSecret: process.env.TIKTOK_CLIENT_SECRET || "BjvVrhJn3n7QK5J3Vu0Dz6AiFOBQQvba"
+  };
+}
+
+// Helper to get correct TikTok Redirect URI dynamically or from environment
+function getTiktokRedirectUri(req: any): string {
+  const envAppUrl = process.env.APP_URL;
+  if (envAppUrl && envAppUrl !== "MY_APP_URL" && envAppUrl.trim() !== "") {
+    return `${envAppUrl.trim().replace(/\/$/, "")}/api/tiktok/callback`;
+  }
+  const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
+  const host = req.headers["x-forwarded-host"] || req.get("host") || "hectron-tik.vercel.app";
+  return `${protocol}://${host}/api/tiktok/callback`;
+}
+
 app.get("/api/tiktok/login", (req, res) => {
-  const clientKey = process.env.TIKTOK_CLIENT_KEY || "";
-  const redirectUri = `${req.protocol}://${req.get("host")}/api/tiktok/callback`;
+  const { clientKey } = getTiktokCredentials();
+  const redirectUri = getTiktokRedirectUri(req);
   
   // State token for anti-CSRF protection
   const state = Math.random().toString(36).substring(2, 15);
@@ -568,8 +599,7 @@ app.post("/api/tiktok/init", async (req, res) => {
     return res.status(400).json({ error: "Code is required" });
   }
 
-  const clientKey = process.env.TIKTOK_CLIENT_KEY || "";
-  const clientSecret = process.env.TIKTOK_CLIENT_SECRET || "";
+  const { clientKey, clientSecret } = getTiktokCredentials();
   let accessToken = String(code);
   let openId = "";
   let realExchangeSuccess = false;
@@ -577,7 +607,7 @@ app.post("/api/tiktok/init", async (req, res) => {
   if (clientKey && clientSecret) {
     try {
       addServerLog("INFO", "TIKTOK", "Exchanging code for official TikTok access token inside /api/tiktok/init...");
-      const redirectUri = `${req.protocol}://${req.get("host")}/api/tiktok/callback`;
+      const redirectUri = getTiktokRedirectUri(req);
       const bodyParams = new URLSearchParams();
       bodyParams.append("client_key", clientKey);
       bodyParams.append("client_secret", clientSecret);
@@ -645,8 +675,7 @@ app.get("/api/tiktok/callback", async (req, res) => {
 
   addServerLog("INFO", "TIKTOK", "TikTok login callback received authorization code successfully", { code, state });
   
-  const clientKey = process.env.TIKTOK_CLIENT_KEY || "";
-  const clientSecret = process.env.TIKTOK_CLIENT_SECRET || "";
+  const { clientKey, clientSecret } = getTiktokCredentials();
   let accessToken = String(code);
   let openId = "";
   let realExchangeSuccess = false;
@@ -654,7 +683,7 @@ app.get("/api/tiktok/callback", async (req, res) => {
   if (clientKey && clientSecret) {
     try {
       addServerLog("INFO", "TIKTOK", "Exchanging code for official TikTok access token...");
-      const redirectUri = `${req.protocol}://${req.get("host")}/api/tiktok/callback`;
+      const redirectUri = getTiktokRedirectUri(req);
       const bodyParams = new URLSearchParams();
       bodyParams.append("client_key", clientKey);
       bodyParams.append("client_secret", clientSecret);

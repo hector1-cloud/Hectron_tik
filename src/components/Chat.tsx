@@ -75,6 +75,7 @@ export function Chat() {
 
   const handleInitTikTok = async () => {
     if (!tiktokCode.trim()) return;
+    localStorage.setItem("hectron_tiktok_code", tiktokCode);
     try {
       const res = await fetch("/api/tiktok/init", {
         method: "POST",

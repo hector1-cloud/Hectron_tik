@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useState, useEffect } from "react";
 import { BrainContext } from "./BrainContext";
 import { LiveControl } from "./components/LiveControl";
 import { SceneSelector } from "./components/SceneSelector";
@@ -6,6 +6,7 @@ import { Chat } from "./components/Chat";
 import { Overlay } from "./components/Overlay";
 import { LogsView } from "./components/LogsView";
 import { PerformanceView } from "./components/PerformanceView";
+import { jsPDF } from "jspdf";
 import {
   Mic,
   Tv,
@@ -22,17 +23,71 @@ import {
   Smartphone,
   Copy,
   Check,
+  Image,
 } from "lucide-react";
+
+const downloadImageAsPDF = async (imageSrc: string, pdfFileName: string) => {
+  const img = new window.Image();
+  img.src = imageSrc;
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = (err) => {
+      console.error("Failed to load image for PDF:", imageSrc, err);
+      reject(err);
+    };
+  });
+
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth || img.width;
+  canvas.height = img.naturalHeight || img.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.drawImage(img, 0, 0);
+  const imgData = canvas.toDataURL("image/jpeg", 0.95);
+
+  const doc = new jsPDF({
+    orientation: canvas.width > canvas.height ? "landscape" : "portrait",
+    unit: "px",
+    format: [canvas.width, canvas.height]
+  });
+
+  doc.addImage(imgData, "JPEG", 0, 0, canvas.width, canvas.height);
+  doc.save(pdfFileName);
+};
 
 export default function App() {
   const [previewType, setPreviewType] = useState<"interactive" | "sketchfab">("interactive");
-  const [tiktokSubTab, setTiktokSubTab] = useState<"web" | "android">("web");
+  const [tiktokSubTab, setTiktokSubTab] = useState<"web" | "android" | "mockups">("web");
   const [copiedText, setCopiedText] = useState<string | null>(null);
+  const [isDownloading1, setIsDownloading1] = useState(false);
+  const [isDownloading2, setIsDownloading2] = useState(false);
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedText(id);
     setTimeout(() => setCopiedText(null), 2000);
+  };
+
+  const handleDownloadPDF1 = async () => {
+    setIsDownloading1(true);
+    try {
+      await downloadImageAsPDF("/tiktok_login_mockup.jpg", "HECTRON_TikTok_Login_Mockup.pdf");
+    } catch (err) {
+      console.error("Error generating PDF 1", err);
+    } finally {
+      setIsDownloading1(false);
+    }
+  };
+
+  const handleDownloadPDF2 = async () => {
+    setIsDownloading2(true);
+    try {
+      await downloadImageAsPDF("/tiktok_live_dashboard.jpg", "HECTRON_TikTok_Live_Mockup.pdf");
+    } catch (err) {
+      console.error("Error generating PDF 2", err);
+    } finally {
+      setIsDownloading2(false);
+    }
   };
 
   const {
@@ -47,6 +102,15 @@ export default function App() {
     latestSpeechText,
     isSpeaking,
   } = useContext(BrainContext);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("tiktok_logout") === "true") {
+      localStorage.removeItem("hectron_tiktok_code");
+      // Clean up URL parameters cleanly
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   if (activeTab === "overlay") {
     return (
@@ -364,7 +428,7 @@ export default function App() {
               </div>
 
               {/* Subtabs for Web & Android SDK */}
-              <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-850 text-xs">
+              <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-850 text-xs gap-1">
                 <button
                   onClick={() => setTiktokSubTab("web")}
                   className={`flex-1 py-2.5 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-2 ${
@@ -387,9 +451,20 @@ export default function App() {
                   <Smartphone className="w-3.5 h-3.5" />
                   <span>Android Companion SDK</span>
                 </button>
+                <button
+                  onClick={() => setTiktokSubTab("mockups")}
+                  className={`flex-1 py-2.5 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-2 ${
+                    tiktokSubTab === "mockups"
+                      ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <Image className="w-3.5 h-3.5" />
+                  <span>Maquetas de UX (Revisión)</span>
+                </button>
               </div>
 
-              {tiktokSubTab === "web" ? (
+              {tiktokSubTab === "web" && (
                 <div className="space-y-4 text-xs text-slate-300">
                   <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-2">
                     <p className="font-bold text-cyan-300">Pasos para conectar tu cuenta:</p>
@@ -437,7 +512,9 @@ export default function App() {
                     )}
                   </div>
                 </div>
-              ) : (
+              )}
+
+              {tiktokSubTab === "android" && (
                 <div className="space-y-5 text-xs text-slate-300 animate-fadeIn">
                   {/* Android Quickstart Header */}
                   <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-3">
@@ -569,6 +646,79 @@ export default function App() {
                         <pre className="notranslate p-3 font-mono text-[11px] text-slate-300 overflow-x-auto bg-slate-950" translate="no">
                           {`<queries>\n    <package android:name="com.zhiliaoapp.musically" />\n    <package android:name="com.ss.android.ugc.trill" />\n</queries>`}
                         </pre>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {tiktokSubTab === "mockups" && (
+                <div className="space-y-5 text-xs text-slate-300 animate-fadeIn">
+                  <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-3">
+                    <span className="font-bold text-cyan-300 text-sm block">Maquetas de UX para Revisión de TikTok</span>
+                    <p className="text-slate-400 leading-relaxed">
+                      TikTok requiere maquetas de alta fidelidad que muestren cómo tu aplicación integra su SDK y flujos de inicio de sesión/transmisión. Puedes descargar estas maquetas personalizadas para subirlas en el campo <strong className="text-slate-200 font-bold">"Sube maquetas de UX de alta fidelidad"</strong> en tu consola de desarrollador de TikTok.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Mockup 1 */}
+                    <div className="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden flex flex-col justify-between">
+                      <div>
+                        <div className="p-3 bg-slate-900 border-b border-slate-800 font-bold text-white flex justify-between items-center">
+                          <span>1. Flujo de Login de TikTok</span>
+                          <span className="text-[10px] bg-cyan-950 text-cyan-400 px-2 py-0.5 rounded font-mono font-normal">LOGIN KIT</span>
+                        </div>
+                        <div className="p-3 bg-slate-950 border-b border-slate-900 flex justify-center items-center">
+                          <img
+                            src="/tiktok_login_mockup.jpg"
+                            alt="Mockup Login TikTok"
+                            className="rounded border border-slate-800 w-full object-cover max-h-[180px] hover:opacity-95 transition"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                        <div className="p-3 text-slate-400 leading-relaxed text-[11px]">
+                          Muestra el panel de control de HECTRON Streamer Studio, el onboarding guiado paso a paso y el botón oficial de inicio de sesión de TikTok (Login Kit).
+                        </div>
+                      </div>
+                      <div className="p-3 bg-slate-900/40 border-t border-slate-900 flex gap-2">
+                        <button
+                          onClick={handleDownloadPDF1}
+                          disabled={isDownloading1}
+                          className="flex-1 py-2 text-center bg-cyan-500 hover:bg-cyan-600 disabled:bg-cyan-700 text-slate-950 font-bold rounded transition text-xs shadow-md shadow-cyan-500/10 cursor-pointer disabled:cursor-not-allowed"
+                        >
+                          {isDownloading1 ? "Generando PDF..." : "Descargar PDF (Maqueta 1)"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Mockup 2 */}
+                    <div className="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden flex flex-col justify-between">
+                      <div>
+                        <div className="p-3 bg-slate-900 border-b border-slate-800 font-bold text-white flex justify-between items-center">
+                          <span>2. Dashboard de Transmisión LIVE</span>
+                          <span className="text-[10px] bg-cyan-950 text-cyan-400 px-2 py-0.5 rounded font-mono font-normal">REAL-TIME SYNC</span>
+                        </div>
+                        <div className="p-3 bg-slate-950 border-b border-slate-900 flex justify-center items-center">
+                          <img
+                            src="/tiktok_live_dashboard.jpg"
+                            alt="Mockup TikTok LIVE"
+                            className="rounded border border-slate-800 w-full object-cover max-h-[180px] hover:opacity-95 transition"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                        <div className="p-3 text-slate-400 leading-relaxed text-[11px]">
+                          Muestra la consola del streamer en tiempo real con el avatar de IA 3D, chat de TikTok sincronizado, regalos en tiempo real, logs de voz TTS y terminal de control.
+                        </div>
+                      </div>
+                      <div className="p-3 bg-slate-900/40 border-t border-slate-900 flex gap-2">
+                        <button
+                          onClick={handleDownloadPDF2}
+                          disabled={isDownloading2}
+                          className="flex-1 py-2 text-center bg-cyan-500 hover:bg-cyan-600 disabled:bg-cyan-700 text-slate-950 font-bold rounded transition text-xs shadow-md shadow-cyan-500/10 cursor-pointer disabled:cursor-not-allowed"
+                        >
+                          {isDownloading2 ? "Generando PDF..." : "Descargar PDF (Maqueta 2)"}
+                        </button>
                       </div>
                     </div>
                   </div>
