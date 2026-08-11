@@ -3,6 +3,14 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/_vercel",
+      "destination": "/_vercel.txt"
+    },
+    {
+      "source": "/hectron-streamer-studio",
+      "destination": "/hectron-streamer-studio.txt"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },

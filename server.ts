@@ -248,6 +248,16 @@ app.get("/tiktokpG8kKkBFdtSrRC63gPsuGnJVyHtyw7D5*", (req, res) => {
   res.send("tiktokpG8kKkBFdtSrRC63gPsuGnJVyHtyw7D5");
 });
 
+app.get("/_vercel*", (req, res) => {
+  res.type("text/plain");
+  res.send("vc-domain-verify=hectron-streamer-studio.ai.studio,e9519ce2ca5a0e4dc894");
+});
+
+app.get("/hectron-streamer-studio*", (req, res) => {
+  res.type("text/plain");
+  res.send("c218223813c8e8fe.vercel-dns-017.com.");
+});
+
 // ================= API ENDPOINTS =================
 
 // 1. Health check
