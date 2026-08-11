@@ -27,32 +27,51 @@ import {
 } from "lucide-react";
 
 const downloadImageAsPDF = async (imageSrc: string, pdfFileName: string) => {
-  const img = new window.Image();
-  img.src = imageSrc;
-  await new Promise((resolve, reject) => {
-    img.onload = resolve;
-    img.onerror = (err) => {
-      console.error("Failed to load image for PDF:", imageSrc, err);
-      reject(err);
-    };
-  });
+  let objectUrl = "";
+  try {
+    // Fetch the image as a Blob to bypass any sandbox/relative resolution quirks inside iframes
+    const response = await fetch(imageSrc);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const blob = await response.blob();
+    objectUrl = URL.createObjectURL(blob);
 
-  const canvas = document.createElement("canvas");
-  canvas.width = img.naturalWidth || img.width;
-  canvas.height = img.naturalHeight || img.height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  ctx.drawImage(img, 0, 0);
-  const imgData = canvas.toDataURL("image/jpeg", 0.95);
+    const img = new window.Image();
+    img.src = objectUrl;
 
-  const doc = new jsPDF({
-    orientation: canvas.width > canvas.height ? "landscape" : "portrait",
-    unit: "px",
-    format: [canvas.width, canvas.height]
-  });
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = (err) => {
+        console.error("Failed to load image from object URL:", err);
+        reject(err);
+      };
+    });
 
-  doc.addImage(imgData, "JPEG", 0, 0, canvas.width, canvas.height);
-  doc.save(pdfFileName);
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth || img.width;
+    canvas.height = img.naturalHeight || img.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Could not get 2D canvas context");
+    ctx.drawImage(img, 0, 0);
+    const imgData = canvas.toDataURL("image/jpeg", 0.95);
+
+    const doc = new jsPDF({
+      orientation: canvas.width > canvas.height ? "landscape" : "portrait",
+      unit: "px",
+      format: [canvas.width, canvas.height]
+    });
+
+    doc.addImage(imgData, "JPEG", 0, 0, canvas.width, canvas.height);
+    doc.save(pdfFileName);
+  } catch (error: any) {
+    console.error("Error generating PDF:", error);
+    throw error;
+  } finally {
+    if (objectUrl) {
+      URL.revokeObjectURL(objectUrl);
+    }
+  }
 };
 
 export default function App() {

@@ -299,7 +299,8 @@ export function BrainProvider({ children }: { children: ReactNode }) {
 
         ws.onerror = (error) => {
           if (!isMounted) return;
-          console.error("WebSocket Error:", error);
+          // Log gracefully to avoid throwing uncaught console.error during server restarts or transient disconnects
+          console.log("WebSocket connecting/reconnecting status...");
         };
       } catch (err: any) {
         addLog("ERROR", "FRONTEND", `Error al inicializar WebSocket: ${err?.message || String(err)}`);

@@ -554,7 +554,7 @@ function getTiktokRedirectUri(req: any): string {
     return `${envAppUrl.trim().replace(/\/$/, "")}/api/tiktok/callback`;
   }
   const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
-  const host = req.headers["x-forwarded-host"] || req.get("host") || "hectron-tik.vercel.app";
+  const host = req.headers["x-forwarded-host"] || req.get("host") || "hectron-streamer-studio-570399074846.us-east1.run.app";
   return `${protocol}://${host}/api/tiktok/callback`;
 }
 
