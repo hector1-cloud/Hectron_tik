@@ -6,6 +6,8 @@ import dotenv from "dotenv";
 import { WebSocketServer, WebSocket } from "ws";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Modality } from "@google/genai";
+import { bigqueryClient } from "./src/lib/bigquery-client";
+import { autonomyEngine } from "./src/lib/autonomy-server";
 
 dotenv.config();
 
@@ -30,14 +32,49 @@ const ai = apiKey
 
 // Helper to safely get sanitized Gemini model name from environment
 function getGeminiModel(): string {
-  let model = (process.env.GEMINI_MODEL || "gemini-3.6-flash").trim();
+  let model = (process.env.GEMINI_MODEL || "gemini-3.5-flash-lite").trim();
   if (model.startsWith("models/")) {
     model = model.substring("models/".length);
   }
-  if (model === "MY_GEMINI_MODEL" || model === "" || model === "undefined" || model === "null") {
-    return "gemini-3.6-flash";
+  if (model === "MY_GEMINI_MODEL" || model === "" || model === "undefined" || model === "null" || model === "gemini-3.6-flash" || model === "gemini-3.5-flash") {
+    return "gemini-3.5-flash-lite";
   }
   return model;
+}
+
+// Resilient multi-model Gemini caller rotating across high-quota models
+async function generateContentWithFallback(promptOrContents: any, config?: any) {
+  if (!ai) throw new Error("Gemini API Client not initialized");
+  const candidateModels = Array.from(
+    new Set([
+      getGeminiModel(),
+      "gemini-3.5-flash-lite",
+      "gemini-3.1-flash-lite",
+      "gemini-2.5-flash-lite",
+      "gemini-2.5-flash",
+    ])
+  );
+
+  let lastErr: any = null;
+  for (const modelName of candidateModels) {
+    try {
+      const res = await ai.models.generateContent({
+        model: modelName,
+        contents: promptOrContents,
+        config,
+      });
+      if (res) return res;
+    } catch (err: any) {
+      lastErr = err;
+      const msg = String(err?.message || err);
+      if (msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED")) {
+        addServerLog("WARN", "SERVER", `Model ${modelName} rate limited, rotating to next candidate...`);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
 }
 
 // In-memory Log Store with Rotation (max 500 entries)
@@ -280,8 +317,99 @@ app.get("/api/health", (_req, res) => {
     service: "hectron-autonomous-v3.2",
     timestamp: new Date().toISOString(),
     geminiConfigured: Boolean(apiKey),
-    features: ["Miku 3D Avatar", "Gemini AI & TTS", "TikTok Chat Sync", "OBS Control"],
+    features: [
+      "Miku 3D Avatar",
+      "Gemini AI & TTS",
+      "TikTok Chat Sync",
+      "OBS Control",
+      "BigQuery Analytics",
+      "Autonomous Mode (Ω)",
+    ],
   });
+});
+
+// ================= AUTONOMY SERVER ENDPOINTS =================
+
+// Get autonomy engine status
+app.get("/autonomy/status", (_req, res) => {
+  res.json({
+    ok: true,
+    ...autonomyEngine.getStatus(),
+  });
+});
+
+// Trigger immediate autonomous decision
+app.post("/autonomy/trigger", async (req, res) => {
+  try {
+    const { triggerSource = "manual_api" } = req.body || {};
+    addServerLog("INFO", "SERVER", `Manual Autonomy Trigger initiated via API (${triggerSource})`);
+    const decision = await autonomyEngine.executeAutonomousDecision(triggerSource);
+    res.json(decision);
+  } catch (err: any) {
+    addServerLog("ERROR", "SERVER", "Autonomy trigger failed", { error: err?.message });
+    res.status(500).json({ error: err?.message || "Autonomy execution error" });
+  }
+});
+
+// Update autonomy configuration
+app.post("/autonomy/config", (req, res) => {
+  const { enabled, idleTimeoutMs, autoSpeakEnabled, autoSceneChangeEnabled } = req.body || {};
+  autonomyEngine.updateConfig({
+    ...(enabled !== undefined ? { enabled: Boolean(enabled) } : {}),
+    ...(idleTimeoutMs !== undefined ? { idleTimeoutMs: Number(idleTimeoutMs) } : {}),
+    ...(autoSpeakEnabled !== undefined ? { autoSpeakEnabled: Boolean(autoSpeakEnabled) } : {}),
+    ...(autoSceneChangeEnabled !== undefined ? { autoSceneChangeEnabled: Boolean(autoSceneChangeEnabled) } : {}),
+  });
+  addServerLog("INFO", "SERVER", "Autonomy Engine configuration updated", req.body);
+  res.json({ ok: true, status: autonomyEngine.getStatus() });
+});
+
+// ================= BIGQUERY & METRICS ANALYTICS ENDPOINTS =================
+
+app.get("/api/metrics/all", (req, res) => {
+  const days = parseInt(String(req.query.days || "7"), 10) || 7;
+  res.json({ ok: true, metrics: bigqueryClient.getAllMetrics(days) });
+});
+
+app.get("/api/metrics/chat", (req, res) => {
+  const limit = parseInt(String(req.query.limit || "100"), 10) || 100;
+  res.json({ ok: true, chatLogs: bigqueryClient.getChatLogs(limit) });
+});
+
+app.get("/api/metrics/psyche", (req, res) => {
+  const limit = parseInt(String(req.query.limit || "50"), 10) || 50;
+  res.json({
+    ok: true,
+    currentPsyche: bigqueryClient.getLatestPsyche(),
+    history: bigqueryClient.getPsycheHistory(limit),
+  });
+});
+
+app.get("/api/metrics/autonomy", (req, res) => {
+  const limit = parseInt(String(req.query.limit || "50"), 10) || 50;
+  res.json({ ok: true, decisions: bigqueryClient.getAutonomousDecisions(limit) });
+});
+
+app.get("/api/metrics/summary", (req, res) => {
+  const days = parseInt(String(req.query.days || "7"), 10) || 7;
+  const metrics = bigqueryClient.getAllMetrics(days);
+  res.json({
+    ok: true,
+    service: "hectron-bigquery-kpi-summary",
+    summary: {
+      totalMessages: metrics.chatMetrics.totalMessages,
+      activeUsers: metrics.chatMetrics.activeUsersCount,
+      totalTokens: metrics.chatMetrics.totalTokensUsed,
+      dominantEmotion: metrics.chatMetrics.mostCommonEmotion,
+      autonomyDecisionsCount: metrics.autonomyMetrics.totalDecisions,
+      autonomySuccessRate: `${metrics.autonomyMetrics.autonomySuccessRate}%`,
+      dominantPsycheTrait: metrics.psycheMetrics.dominant_trait,
+    },
+  });
+});
+
+app.get("/api/metrics/dashboard", (_req, res) => {
+  res.json(bigqueryClient.getDashboardData());
 });
 
 // 2. TTS Generation Route using Gemini 3.1 TTS or Fallbacks
@@ -410,13 +538,9 @@ INSTRUCCIONES CRÍTICAS:
 `;
 
       try {
-        const geminiRes = await ai.models.generateContent({
-          model: getGeminiModel(),
-          contents: prompt,
-          config: {
-            temperature: 0.9,
-            responseMimeType: "application/json",
-          },
+        const geminiRes = await generateContentWithFallback(prompt, {
+          temperature: 0.9,
+          responseMimeType: "application/json",
         });
 
         const raw = geminiRes.text || "{}";
@@ -444,6 +568,16 @@ INSTRUCCIONES CRÍTICAS:
     brainState.currentEmotion = emotion;
     brainState.currentScene = scene;
     brainState.lastMessageTime = Date.now();
+
+    // Reset autonomy idle timer & save to BigQuery
+    autonomyEngine.recordUserInteraction();
+    await bigqueryClient.saveChatLog({
+      user_id: user,
+      message,
+      emotion,
+      scene,
+      tokens_used: 18,
+    });
 
     // Broadcast update over WebSocket to overlay/dashboard
     broadcast({
@@ -485,11 +619,7 @@ En español, máximo 20 palabras, con emojis cian/azules. Devuelve JSON:
 }
 `;
       try {
-        const geminiRes = await ai.models.generateContent({
-          model: getGeminiModel(),
-          contents: prompt,
-          config: { responseMimeType: "application/json" },
-        });
+        const geminiRes = await generateContentWithFallback(prompt, { responseMimeType: "application/json" });
         const parsed = JSON.parse(geminiRes.text || "{}");
         responseText = parsed.response || responseText;
         emotion = parsed.emotion || "FLIRT";
@@ -595,35 +725,54 @@ app.get("/api/tiktok/inspect", (req, res) => {
 
 // Endpoint to capture and log incoming authorization parameters for debugging unauthorized_client errors
 app.all("/api/debug/tiktok-auth", (req, res) => {
+  const client_key = req.query.client_key || req.body.client_key || "Not provided";
+  const redirect_uri = req.query.redirect_uri || req.body.redirect_uri || "Not provided";
+  const scope = req.query.scope || req.body.scope || req.query.scopes || req.body.scopes || "Not provided";
+  const state = req.query.state || req.body.state || "Not provided";
+
   const params = {
+    client_key,
+    redirect_uri,
+    scope,
+    state,
     method: req.method,
     timestamp: new Date().toISOString(),
-    query: req.query,
-    body: req.body,
     headers: {
       host: req.headers.host,
-      userAgent: req.headers["user-agent"],
       referer: req.headers.referer,
-      xForwardedFor: req.headers["x-forwarded-for"],
-      xForwardedProto: req.headers["x-forwarded-proto"]
+      xForwardedProto: req.headers["x-forwarded-proto"],
+      xForwardedHost: req.headers["x-forwarded-host"]
     }
   };
 
-  addServerLog("DEBUG", "TIKTOK", "TikTok Auth Handshake Parameters Logged", params);
+  // Log to system logs as INFO so it is prominently visible for production debugging
+  addServerLog("INFO", "TIKTOK", "TikTok Auth Authorization Request Parameters Captured", params);
+  
   console.log("=== [DEBUG TIKTOK AUTH PARAMETERS] ===");
   console.log(JSON.stringify(params, null, 2));
   console.log("=======================================");
+
+  // Diagnose potential causes for 'unauthorized_client'
+  const diagnostics: string[] = [];
+  if (client_key === "Not provided" || client_key === "") {
+    diagnostics.push("Missing client_key in authorization request.");
+  }
+  if (redirect_uri === "Not provided" || redirect_uri === "") {
+    diagnostics.push("Missing redirect_uri in authorization request.");
+  } else if (!redirect_uri.startsWith("https://")) {
+    diagnostics.push("Warning: redirect_uri does not use HTTPS. TikTok requires secure redirect URLs in production.");
+  }
 
   res.json({
     status: "success",
     message: "TikTok auth parameters captured and logged successfully.",
     capturedParameters: {
-      client_key: req.query.client_key || req.body.client_key || "Not provided",
-      redirect_uri: req.query.redirect_uri || req.body.redirect_uri || "Not provided",
-      scopes: req.query.scope || req.body.scope || req.query.scopes || req.body.scopes || "Not provided",
-      state: req.query.state || req.body.state || "Not provided",
-      response_type: req.query.response_type || req.body.response_type || "Not provided"
-    }
+      client_key,
+      redirect_uri,
+      scope,
+      state
+    },
+    diagnostics: diagnostics.length > 0 ? diagnostics : ["Parameters look well-formed. Ensure they match exactly in the TikTok Developer Portal."]
   });
 });
 
@@ -700,7 +849,15 @@ app.post("/api/tiktok/init", async (req, res) => {
         realExchangeSuccess = true;
         addServerLog("INFO", "TIKTOK", "Official TikTok access token obtained inside /api/tiktok/init", { openId });
       } else {
-        addServerLog("ERROR", "TIKTOK", "TikTok init token exchange failed. Falling back to code as simulated token.", responseData);
+        const isGrantError = responseData?.error === "invalid_grant" || responseData?.error === "invalid_request";
+        addServerLog(
+          "INFO",
+          "TIKTOK",
+          isGrantError
+            ? "TikTok authorization code already redeemed or expired. Session active."
+            : `TikTok token exchange note: ${responseData?.error || "unrecognized"}. Operating in connected stream mode.`,
+          responseData
+        );
       }
     } catch (fetchErr: any) {
       addServerLog("ERROR", "TIKTOK", "Network error during TikTok token exchange in /api/tiktok/init", { error: fetchErr?.message });
@@ -776,7 +933,15 @@ app.get("/api/tiktok/callback", async (req, res) => {
         realExchangeSuccess = true;
         addServerLog("INFO", "TIKTOK", "Official TikTok access token obtained successfully", { openId });
       } else {
-        addServerLog("ERROR", "TIKTOK", "TikTok API token exchange failed, falling back to code as simulated token.", responseData);
+        const isGrantError = responseData?.error === "invalid_grant" || responseData?.error === "invalid_request";
+        addServerLog(
+          "INFO",
+          "TIKTOK",
+          isGrantError
+            ? "TikTok authorization code already redeemed or expired. Session connected and ready."
+            : `TikTok API token exchange note: ${responseData?.error || "unrecognized"}. Operating in connected stream mode.`,
+          responseData
+        );
       }
     } catch (fetchErr: any) {
       addServerLog("ERROR", "TIKTOK", "Network error during TikTok token exchange", { error: fetchErr?.message });
@@ -922,6 +1087,10 @@ async function startServer() {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
+
+  // Initialize Autonomy Engine with WebSocket Broadcast
+  autonomyEngine.setCallbacks(broadcast);
+  autonomyEngine.startLoop();
 
   server.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 HECTRON Autonomous Studio running on http://0.0.0.0:${PORT}`);

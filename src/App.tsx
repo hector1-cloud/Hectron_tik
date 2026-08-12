@@ -6,6 +6,7 @@ import { Chat } from "./components/Chat";
 import { Overlay } from "./components/Overlay";
 import { LogsView } from "./components/LogsView";
 import { PerformanceView } from "./components/PerformanceView";
+import { AutonomyMetricsView } from "./components/AutonomyMetricsView";
 import { jsPDF } from "jspdf";
 import {
   Mic,
@@ -13,6 +14,7 @@ import {
   Radio,
   Settings,
   Music2,
+  Database,
   Sparkles,
   ExternalLink,
   Bot,
@@ -492,16 +494,42 @@ export default function App() {
   } | null>(null);
   const [isDiagnosing, setIsDiagnosing] = useState(false);
 
+  // Helper para espera de tiempo (delay)
+  const waitMs = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  // Lógica de reintento exponencial (exponential backoff) para peticiones a endpoints
+  const fetchWithBackoff = async (url: string, options: RequestInit = {}, maxRetries = 3, initialDelay = 1000): Promise<Response> => {
+    let attempt = 0;
+    while (true) {
+      try {
+        const response = await fetch(url, options);
+        if (response.ok) return response;
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      } catch (err) {
+        attempt++;
+        if (attempt > maxRetries) {
+          throw err;
+        }
+        const backoffDelay = initialDelay * Math.pow(2, attempt);
+        console.warn(`[TikTok Retry] Intento ${attempt} fallido para ${url}. Reintentando en ${backoffDelay}ms...`, err);
+        await waitMs(backoffDelay);
+      }
+    }
+  };
+
   const runTiktokDiagnostics = async () => {
     setIsDiagnosing(true);
     try {
-      const res = await fetch("/api/tiktok/inspect");
+      // Conexión resiliente usando nuestra lógica de reintento exponencial
+      const res = await fetchWithBackoff("/api/tiktok/inspect");
       if (res.ok) {
         const payload = await res.json();
         const configuredRedirect = payload.data.redirectUri;
-        const currentOrigin = window.location.origin;
         
-        // Extract host of configured redirect to compare cleanly
+        // Comparación dinámica de la URL actual de la aplicación (window.location.href) con REDIRECT_URI
+        const currentUrl = window.location.href;
+        const currentOrigin = new URL(currentUrl).origin;
+        
         const parsedRedirect = new URL(configuredRedirect);
         const redirectOrigin = parsedRedirect.origin;
         const hostMatches = redirectOrigin === currentOrigin;
@@ -515,7 +543,7 @@ export default function App() {
         });
       }
     } catch (err) {
-      console.error("Failed to run diagnostics:", err);
+      console.error("Failed to run diagnostics after backoff retries:", err);
     } finally {
       setIsDiagnosing(false);
     }
@@ -641,6 +669,18 @@ export default function App() {
             >
               <Settings className="w-4 h-4" />
               <span>Agente Local</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("autonomy" as any)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                (activeTab as string) === "autonomy"
+                  ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Database className="w-4 h-4" />
+              <span>Autonomía & BigQuery</span>
             </button>
 
             <button
@@ -846,6 +886,12 @@ export default function App() {
           </div>
         )}
 
+        {(activeTab as string) === "autonomy" && (
+          <div className="max-w-7xl mx-auto">
+            <AutonomyMetricsView />
+          </div>
+        )}
+
         {activeTab === "tiktok" && (
           <div className="max-w-3xl mx-auto space-y-6">
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg space-y-5">
@@ -1023,6 +1069,22 @@ export default function App() {
                       {tiktokConnected ? "● CONECTADO" : "MODO DEMO"}
                     </span>
                   </div>
+
+                  {diagnosticResult && !diagnosticResult.hostMatches && (
+                    <div className="bg-red-950/40 border border-red-500/30 p-3.5 rounded-lg flex items-start gap-3 text-xs text-red-300">
+                      <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="font-bold text-red-200">⚠️ Discrepancia de Redirección Detectada</p>
+                        <p className="text-slate-300 leading-relaxed">
+                          La URL de tu navegador actual (<span className="font-mono text-white">{window.location.href}</span>) no coincide con el host registrado de tu <span className="font-mono text-cyan-300">REDIRECT_URI</span> en el servidor (<span className="font-mono text-white">{diagnosticResult.redirectUri}</span>). 
+                          El intento de inicio de sesión de TikTok fallará con el error <strong className="text-red-400">unauthorized_client</strong>. 
+                        </p>
+                        <p className="text-[11px] text-red-300 font-semibold">
+                          Por favor, configura tu URL correcta en el portal de TikTok Developers antes de conectar, o usa el dominio correcto de redirección.
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex flex-col sm:flex-row gap-3 pt-2">
                     <a

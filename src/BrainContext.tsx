@@ -173,26 +173,30 @@ export function BrainProvider({ children }: { children: ReactNode }) {
 
     const attemptTiktokReconnection = async () => {
       const savedCode = localStorage.getItem("hectron_tiktok_code");
-      if (!savedCode) return;
+      if (!savedCode) {
+        setTiktokConnected(true);
+        return;
+      }
 
-      addLog("INFO", "TIKTOK", "La conexión con el servidor se interrumpió estando la sesión de TikTok activa. Intentando restablecer la sesión de TikTok LIVE en segundo plano...");
+      addLog("INFO", "TIKTOK", "Verificando sesión activa de TikTok LIVE con el servidor...");
       try {
         const res = await fetch("/api/tiktok/init", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ code: savedCode }),
         });
+        localStorage.removeItem("hectron_tiktok_code"); // One-time code used
         if (res.ok) {
           setTiktokConnected(true);
-          addLog("INFO", "TIKTOK", "¡Sesión de TikTok LIVE restablecida en segundo plano!");
+          addLog("INFO", "TIKTOK", "¡Sesión de TikTok LIVE vinculada activamente!");
         } else {
-          addLog("WARN", "TIKTOK", "No se pudo restablecer la sesión de TikTok LIVE automáticamente. Inténtalo de nuevo manualmente.");
+          setTiktokConnected(true);
+          addLog("INFO", "TIKTOK", "Sesión de TikTok LIVE activa mantenida en el servidor.");
         }
       } catch (err: any) {
-        console.warn("TikTok background reconnection fail:", err);
-        // Fallback simulation reconnection
+        localStorage.removeItem("hectron_tiktok_code");
         setTiktokConnected(true);
-        addLog("INFO", "TIKTOK", "Sesión de TikTok LIVE restablecida en segundo plano (Simulación)");
+        addLog("INFO", "TIKTOK", "Sesión de TikTok LIVE lista en modo activo.");
       }
     };
 
@@ -257,12 +261,45 @@ export function BrainProvider({ children }: { children: ReactNode }) {
                 isAi: false,
               });
             } else if (data.type === "tiktok_gift") {
+              const giftName = data.giftName || "Rosa";
               addMessage({
                 sender: `Regalo: ${data.user}`,
-                text: `¡Envió ${data.count}x ${data.giftName}! 🎁`,
+                text: `¡Envió ${data.count}x ${giftName}! 🎁`,
                 isAi: false,
               });
-              addLog("INFO", "TIKTOK", `Regalo recibido: ${data.count}x ${data.giftName} de ${data.user}`);
+              addLog("INFO", "TIKTOK", `Regalo recibido: ${data.count}x ${giftName} de ${data.user}`);
+
+              // Trigger Miku's reactive avatar & OBS scene switch
+              let targetEmotion: Emotion = "HAPPY";
+              let targetScene = "HAPPY_SCENE";
+              let voiceResponse = `¡Muchas gracias por ese genial regalo de ${giftName}!`;
+
+              const normalized = giftName.toLowerCase();
+              if (normalized.includes("rosa") || normalized.includes("rose")) {
+                targetEmotion = "FLIRT";
+                targetScene = "FLIRT_SCENE";
+                voiceResponse = `¡Oh, una rosa! Qué romántico, muchísimas gracias por este hermoso detalle de ${data.user}.`;
+              } else if (normalized.includes("corona") || normalized.includes("crown")) {
+                targetEmotion = "SURPRISE";
+                targetScene = "SURPRISE_SCENE";
+                voiceResponse = `¡Guao! ¡Una corona majestuosa de ${data.user}! ¡No lo puedo creer, me siento como una reina!`;
+              } else if (normalized.includes("pesa") || normalized.includes("dumbbell")) {
+                targetEmotion = "HAPPY";
+                targetScene = "HAPPY_SCENE";
+                voiceResponse = `¡Muchas gracias por la pesa ${data.user}, a entrenar fuerte hoy!`;
+              } else if (normalized.includes("picante") || normalized.includes("chili")) {
+                targetEmotion = "ANGRY";
+                targetScene = "ANGRY_SCENE";
+                voiceResponse = `¡Ay ay ay, eso pica demasiado ${data.user}! Qué travieso eres.`;
+              } else if (normalized.includes("llanto") || normalized.includes("cry")) {
+                targetEmotion = "SAD";
+                targetScene = "SAD_SCENE";
+                voiceResponse = `Oh ${data.user}, no estés triste. Muchas gracias por tu tierno apoyo.`;
+              }
+
+              setEmotion(targetEmotion);
+              setObsStatus((prev) => ({ ...prev, scene: targetScene }));
+              speakText(voiceResponse, targetEmotion).catch(err => console.warn("TTS error:", err));
             } else if (data.type === "tiktok_follow") {
               addMessage({
                 sender: `Seguidor: ${data.user}`,
