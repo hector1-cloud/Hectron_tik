@@ -4,6 +4,36 @@ import * as THREE from "three";
 import { Emotion } from "../types";
 import { BrainContext } from "../BrainContext";
 
+// Highly compatible Timer implementation aligning with THREE.Timer API to guarantee seamless production building
+class Timer {
+  private _currentTime: number;
+  private _previousTime: number;
+  private _elapsedTime: number;
+  private _deltaTime: number;
+
+  constructor() {
+    this._currentTime = performance.now() / 1000;
+    this._previousTime = this._currentTime;
+    this._elapsedTime = 0;
+    this._deltaTime = 0;
+  }
+
+  getElapsed(): number {
+    return this._elapsedTime;
+  }
+
+  getDelta(): number {
+    return this._deltaTime;
+  }
+
+  update(): void {
+    this._currentTime = performance.now() / 1000;
+    this._deltaTime = this._currentTime - this._previousTime;
+    this._previousTime = this._currentTime;
+    this._elapsedTime += this._deltaTime;
+  }
+}
+
 interface HectronCloudProps {
   emotion?: Emotion;
   isSpeaking?: boolean;
@@ -30,6 +60,7 @@ export function HectronCloud({ emotion = "IDLE", isSpeaking = false }: HectronCl
   const rightEyeRef = useRef<THREE.Mesh>(null!);
   const lightRef = useRef<THREE.DirectionalLight>(null!);
 
+  const timerRef = useRef(new Timer());
   const [blink, setBlink] = useState(false);
 
   // Dynamic mesh segment count based on LOD
@@ -47,8 +78,11 @@ export function HectronCloud({ emotion = "IDLE", isSpeaking = false }: HectronCl
     return () => clearInterval(interval);
   }, []);
 
-  useFrame((state) => {
-    const time = state.clock.getElapsedTime();
+  useFrame(() => {
+    const timer = timerRef.current;
+    // Update the timer on each frame
+    timer.update();
+    const time = timer.getElapsed();
 
     // Subtle breathing animation
     if (groupRef.current) {

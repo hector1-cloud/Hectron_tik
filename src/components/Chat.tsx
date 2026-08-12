@@ -12,6 +12,7 @@ export function Chat() {
     isAutonomous,
     speakText,
     isSpeaking,
+    addLog,
   } = useContext(BrainContext);
 
   const [input, setInput] = useState("");
@@ -76,18 +77,43 @@ export function Chat() {
   const handleInitTikTok = async () => {
     if (!tiktokCode.trim()) return;
     localStorage.setItem("hectron_tiktok_code", tiktokCode);
-    try {
-      const res = await fetch("/api/tiktok/init", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: tiktokCode }),
-      });
-      if (res.ok) {
-        setTiktokConnected(true);
+    
+    const maxRetries = 3;
+    let attempt = 0;
+    
+    const makeRequest = async (): Promise<boolean> => {
+      try {
+        const res = await fetch("/api/tiktok/init", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: tiktokCode }),
+        });
+        if (res.ok) {
+          return true;
+        }
+        throw new Error(`Server status: ${res.status}`);
+      } catch (err) {
+        if (attempt < maxRetries) {
+          attempt++;
+          const delay = Math.pow(2, attempt) * 1000;
+          addLog("WARN", "TIKTOK", `Fallo de conexión en el handshake de TikTok. Reintentando en ${delay / 1000}s (Intento ${attempt}/${maxRetries})...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return makeRequest();
+        }
+        throw err;
       }
-    } catch (err) {
-      console.warn("TikTok simulation:", err);
+    };
+
+    try {
+      const success = await makeRequest();
+      if (success) {
+        setTiktokConnected(true);
+        addLog("INFO", "TIKTOK", "Sesión de TikTok LIVE vinculada de manera exitosa tras la validación de red.");
+      }
+    } catch (err: any) {
+      console.warn("TikTok connection failed after retries, applying fallback simulation:", err);
       setTiktokConnected(true);
+      addLog("INFO", "TIKTOK", "Sesión de TikTok LIVE vinculada (Modo simulación tras reintentos fallidos)");
     }
   };
 

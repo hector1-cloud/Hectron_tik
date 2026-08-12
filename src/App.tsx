@@ -24,6 +24,8 @@ import {
   Copy,
   Check,
   Image,
+  AlertTriangle,
+  CheckCircle2,
 } from "lucide-react";
 
 const downloadImageAsPDF = async (imageSrc: string, pdfFileName: string) => {
@@ -90,7 +92,182 @@ export default function App() {
   const handleDownloadPDF1 = async () => {
     setIsDownloading1(true);
     try {
-      await downloadImageAsPDF("/tiktok_login_mockup.jpg", "HECTRON_TikTok_Login_Mockup.pdf");
+      const doc = new jsPDF({
+        orientation: "landscape",
+        unit: "px",
+        format: [842, 595]
+      });
+
+      // Background Slate-950
+      doc.setFillColor(9, 15, 29);
+      doc.rect(0, 0, 842, 595, "F");
+
+      // Header Banner
+      doc.setFillColor(17, 24, 39);
+      doc.rect(0, 0, 842, 80, "F");
+      // Accent line
+      doc.setFillColor(6, 182, 212);
+      doc.rect(0, 78, 842, 2, "F");
+
+      // Title
+      doc.setTextColor(6, 182, 212);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.text("HECTRON STREAMER STUDIO", 40, 35);
+
+      // Subtitle
+      doc.setTextColor(229, 231, 235);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.text("TikTok Integration - User Authorization Flow (UX Mockup)", 40, 55);
+
+      // Status Badge
+      doc.setFillColor(16, 185, 129);
+      doc.rect(700, 25, 100, 22, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text("HIGH-FIDELITY", 712, 39);
+
+      // Left Column - App metadata
+      doc.setFillColor(17, 24, 39);
+      doc.setDrawColor(31, 41, 55);
+      doc.rect(40, 110, 340, 420, "FD");
+
+      doc.setTextColor(6, 182, 212);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.text("1. INFORMACIÓN DE LA APLICACIÓN", 60, 140);
+
+      doc.setTextColor(209, 213, 219);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      
+      let y = 170;
+      const lines = [
+        "Nombre: HECTRON Streamer Studio",
+        "Client Key: awvckv5za3nclqpe",
+        "Redirect URI: https://hectron-streamer-studio-570399074846.us-east1.run.app/api/tiktok/callback",
+        "",
+        "ÁMBITOS SOLICITADOS (SCOPES):",
+        "• user.info.basic (Información de Perfil)",
+        "",
+        "DESCRIPCIÓN DEL FLUJO DE AUTORIZACIÓN:",
+        "Este mockup de alta fidelidad demuestra cómo la",
+        "aplicación inicia la conexión segura con TikTok LIVE.",
+        "El streamer hace clic en 'Conectar TikTok' en el panel",
+        "de HECTRON, lo cual abre la ventana de autorización",
+        "oficial de TikTok.",
+        "",
+        "Una vez autorizado, el servidor recibe el código de",
+        "acceso para iniciar la sincronización de comentarios",
+        "y regalos del directo en tiempo real."
+      ];
+      
+      lines.forEach(line => {
+        if (line.startsWith("•") || line.startsWith("Nombre:") || line.startsWith("Client Key:") || line.startsWith("Redirect URI:") || line.startsWith("ÁMBITOS")) {
+          doc.setFont("helvetica", "bold");
+        } else {
+          doc.setFont("helvetica", "normal");
+        }
+        doc.text(line, 60, y);
+        y += 18;
+      });
+
+      // Right Column - Simulated Phone Authorization Window
+      doc.setFillColor(17, 24, 39);
+      doc.setDrawColor(31, 41, 55);
+      doc.rect(420, 110, 380, 420, "FD");
+
+      // Phone body outer
+      doc.setFillColor(3, 7, 18);
+      doc.setDrawColor(75, 85, 99);
+      doc.rect(470, 130, 280, 380, "FD");
+
+      // Phone screen header
+      doc.setFillColor(17, 24, 39);
+      doc.rect(470, 130, 280, 40, "F");
+      doc.setTextColor(156, 163, 175);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.text("tiktok.com/v2/auth/authorize", 485, 154);
+
+      // Close button indicator
+      doc.setDrawColor(156, 163, 175);
+      doc.line(725, 148, 735, 156);
+      doc.line(735, 148, 725, 156);
+
+      // Auth content inside phone
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.text("Autorizar HECTRON Studio", 520, 210);
+
+      // App icons connector
+      // TikTok Circle
+      doc.setFillColor(254, 44, 85);
+      doc.circle(570, 255, 20, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.text("d", 567, 260); // Simulated TikTok logo symbol
+
+      // Link indicator
+      doc.setDrawColor(6, 182, 212);
+      doc.line(595, 255, 625, 255);
+
+      // App Circle
+      doc.setFillColor(6, 182, 212);
+      doc.circle(650, 255, 20, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.text("H", 646, 260);
+
+      // Permissions bullet
+      doc.setTextColor(209, 213, 219);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.text("Esta aplicación solicita permiso para:", 500, 310);
+      
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(255, 255, 255);
+      doc.text("• Acceder a tu información básica de perfil", 500, 330);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(156, 163, 175);
+      doc.setFontSize(8);
+      doc.text("(Nombre de usuario, foto de perfil y display name)", 510, 342);
+
+      doc.setFontSize(9);
+      doc.setTextColor(156, 163, 175);
+      doc.text("Al hacer clic en Autorizar, aceptas compartir", 500, 380);
+      doc.text("esta información según nuestros términos.", 500, 392);
+
+      // Red-pink TikTok Authorize Button
+      doc.setFillColor(254, 44, 85);
+      doc.rect(500, 415, 220, 32, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text("Autorizar", 590, 434);
+
+      // Cancel Button
+      doc.setFillColor(31, 41, 55);
+      doc.rect(500, 455, 220, 32, "F");
+      doc.setTextColor(209, 213, 219);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text("Cancelar", 592, 474);
+
+      // Footer
+      doc.setFillColor(17, 24, 39);
+      doc.rect(0, 560, 842, 35, "F");
+      doc.setTextColor(156, 163, 175);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.text("CONFIDENTIAL UX DESIGN PROPOSAL FOR TIKTOK DEVELOPER REVIEW • © 2026 HECTRON STUDIO", 190, 582);
+
+      doc.save("HECTRON_TikTok_Login_Mockup.pdf");
     } catch (err) {
       console.error("Error generating PDF 1", err);
     } finally {
@@ -101,7 +278,189 @@ export default function App() {
   const handleDownloadPDF2 = async () => {
     setIsDownloading2(true);
     try {
-      await downloadImageAsPDF("/tiktok_live_dashboard.jpg", "HECTRON_TikTok_Live_Mockup.pdf");
+      const doc = new jsPDF({
+        orientation: "landscape",
+        unit: "px",
+        format: [842, 595]
+      });
+
+      // Background Slate-950
+      doc.setFillColor(9, 15, 29);
+      doc.rect(0, 0, 842, 595, "F");
+
+      // Header Banner
+      doc.setFillColor(17, 24, 39);
+      doc.rect(0, 0, 842, 80, "F");
+      // Accent line
+      doc.setFillColor(6, 182, 212);
+      doc.rect(0, 78, 842, 2, "F");
+
+      // Title
+      doc.setTextColor(6, 182, 212);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.text("HECTRON STREAMER STUDIO", 40, 35);
+
+      // Subtitle
+      doc.setTextColor(229, 231, 235);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.text("TikTok LIVE Dashboard - Real-Time Interface (UX Mockup)", 40, 55);
+
+      // Status Badge
+      doc.setFillColor(16, 185, 129);
+      doc.rect(700, 25, 100, 22, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text("HIGH-FIDELITY", 712, 39);
+
+      // Panel 1: Left - AI Avatar Voice Preview
+      doc.setFillColor(17, 24, 39);
+      doc.setDrawColor(31, 41, 55);
+      doc.rect(40, 110, 240, 420, "FD");
+
+      doc.setTextColor(6, 182, 212);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.text("AVATAR DE IA 3D", 55, 135);
+
+      // LIVE indicator
+      doc.setFillColor(239, 68, 68);
+      doc.rect(205, 125, 60, 16, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.text("● EN VIVO", 213, 136);
+
+      // Simulated Avatar circle
+      doc.setFillColor(31, 41, 55);
+      doc.setDrawColor(6, 182, 212);
+      doc.circle(160, 250, 60, "FD");
+      
+      // Face indicator
+      doc.setTextColor(6, 182, 212);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(36);
+      doc.text("🤖", 143, 262);
+
+      // Under-avatar info
+      doc.setFontSize(10);
+      doc.setTextColor(255, 255, 255);
+      doc.text("Estado: Hablando...", 110, 340);
+      doc.setTextColor(156, 163, 175);
+      doc.setFont("helvetica", "normal");
+      doc.text("Voz: Hectron-Latino AI", 100, 360);
+
+      // Soundwaves
+      doc.setDrawColor(6, 182, 212);
+      doc.setLineWidth(2);
+      for (let i = 0; i < 15; i++) {
+        const h = 10 + Math.sin(i * 0.8) * 20;
+        doc.line(75 + i * 11, 420 - h/2, 75 + i * 11, 420 + h/2);
+      }
+      doc.setLineWidth(1);
+
+      // Panel 2: Center - Chat de TikTok en Vivo
+      doc.setFillColor(17, 24, 39);
+      doc.setDrawColor(31, 41, 55);
+      doc.rect(300, 110, 260, 420, "FD");
+
+      doc.setTextColor(6, 182, 212);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.text("CHAT DE TIKTOK LIVE", 315, 135);
+
+      // Chat list
+      let chatY = 170;
+      const chatItems = [
+        { user: "alberto92", msg: "¡Hectron, eres el mejor streamer de IA! 🔥", color: [34, 197, 94] },
+        { user: "sofia_stream", msg: "Envió Regalo: Rosa x5! 🌹", color: [244, 63, 94] },
+        { user: "hector_fans", msg: "¡Sube el volumen del avatar!", color: [59, 130, 246] },
+        { user: "marcos_v", msg: "Nuevo seguidor en directo 💖", color: [168, 85, 247] },
+        { user: "ana_k", msg: "Hectron responde a mi pregunta de antes...", color: [34, 197, 94] }
+      ];
+
+      chatItems.forEach(item => {
+        // Chat item background
+        doc.setFillColor(31, 41, 55);
+        doc.rect(315, chatY, 230, 55, "F");
+
+        // Username
+        doc.setTextColor(item.color[0], item.color[1], item.color[2]);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.text(`@${item.user}`, 325, chatY + 18);
+
+        // Message
+        doc.setTextColor(229, 231, 235);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.text(item.msg, 325, chatY + 35);
+
+        chatY += 65;
+      });
+
+      // Panel 3: Right - Logs del Sintetizador / Consola
+      doc.setFillColor(17, 24, 39);
+      doc.setDrawColor(31, 41, 55);
+      doc.rect(580, 110, 220, 420, "FD");
+
+      doc.setTextColor(6, 182, 212);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.text("CONSOLA DEL SISTEMA", 595, 135);
+
+      // Terminal logs
+      doc.setFillColor(3, 7, 18);
+      doc.rect(595, 160, 190, 340, "F");
+
+      doc.setTextColor(34, 197, 94);
+      doc.setFont("courier", "bold");
+      doc.setFontSize(8);
+
+      let logY = 185;
+      const logLines = [
+        "[SYSTEM] Boot sequence OK",
+        "[OBS] Scene switched to 'CHAT'",
+        "[TIKTOK] Room connection open",
+        "[TIKTOK] Room ID: 74210984711",
+        "",
+        "[EVENT] Gift received!",
+        "User: @sofia_stream",
+        "Gift: 5x Rose 🌹",
+        "[AI] Triggering 'EXCITED' face",
+        "[TTS] Synthesizing speech...",
+        "\"Muchas gracias @sofia_stream",
+        "por las rosas! Me alegra\"",
+        "",
+        "[EVENT] Follow received!",
+        "User: @marcos_v",
+        "[AI] Triggering 'HAPPY' face",
+        "[TTS] Synthesizing speech..."
+      ];
+
+      logLines.forEach(line => {
+        if (line.includes("[EVENT]") || line.includes("[AI]")) {
+          doc.setTextColor(234, 179, 8); // Yellow
+        } else if (line.includes("[TTS]")) {
+          doc.setTextColor(6, 182, 212); // Cyan
+        } else {
+          doc.setTextColor(34, 197, 94); // Green
+        }
+        doc.text(line, 605, logY);
+        logY += 15;
+      });
+
+      // Footer
+      doc.setFillColor(17, 24, 39);
+      doc.rect(0, 560, 842, 35, "F");
+      doc.setTextColor(156, 163, 175);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.text("CONFIDENTIAL UX DESIGN PROPOSAL FOR TIKTOK DEVELOPER REVIEW • © 2026 HECTRON STUDIO", 190, 582);
+
+      doc.save("HECTRON_TikTok_Live_Mockup.pdf");
     } catch (err) {
       console.error("Error generating PDF 2", err);
     } finally {
@@ -122,6 +481,46 @@ export default function App() {
     isSpeaking,
   } = useContext(BrainContext);
 
+  const [tiktokError, setTiktokError] = useState<string | null>(null);
+  const [tiktokSuccess, setTiktokSuccess] = useState<boolean>(false);
+  const [diagnosticResult, setDiagnosticResult] = useState<{
+    redirectUri: string;
+    hostMatches: boolean;
+    currentHost: string;
+    configuredRedirect: string;
+    suggestedRedirect: string;
+  } | null>(null);
+  const [isDiagnosing, setIsDiagnosing] = useState(false);
+
+  const runTiktokDiagnostics = async () => {
+    setIsDiagnosing(true);
+    try {
+      const res = await fetch("/api/tiktok/inspect");
+      if (res.ok) {
+        const payload = await res.json();
+        const configuredRedirect = payload.data.redirectUri;
+        const currentOrigin = window.location.origin;
+        
+        // Extract host of configured redirect to compare cleanly
+        const parsedRedirect = new URL(configuredRedirect);
+        const redirectOrigin = parsedRedirect.origin;
+        const hostMatches = redirectOrigin === currentOrigin;
+
+        setDiagnosticResult({
+          redirectUri: configuredRedirect,
+          hostMatches,
+          currentHost: currentOrigin,
+          configuredRedirect,
+          suggestedRedirect: `${currentOrigin}/api/tiktok/callback`
+        });
+      }
+    } catch (err) {
+      console.error("Failed to run diagnostics:", err);
+    } finally {
+      setIsDiagnosing(false);
+    }
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("tiktok_logout") === "true") {
@@ -129,6 +528,23 @@ export default function App() {
       // Clean up URL parameters cleanly
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+    
+    const errParam = params.get("tiktok_error");
+    if (errParam) {
+      setTiktokError(decodeURIComponent(errParam));
+      // Clean up URL parameters cleanly
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    const successParam = params.get("tiktok_success");
+    if (successParam === "true") {
+      setTiktokSuccess(true);
+      // Clean up URL parameters cleanly
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // Run diagnostics immediately to help user
+    runTiktokDiagnostics();
   }, []);
 
   if (activeTab === "overlay") {
@@ -485,6 +901,44 @@ export default function App() {
 
               {tiktokSubTab === "web" && (
                 <div className="space-y-4 text-xs text-slate-300">
+                  {/* OAuth Handshake Error / Success Alerts */}
+                  {tiktokError && (
+                    <div className="bg-red-950/50 border border-red-500/40 p-4 rounded-lg space-y-2 animate-fadeIn">
+                      <div className="flex items-center gap-2 text-red-400 font-bold text-sm">
+                        <AlertTriangle className="w-5 h-5" />
+                        <span>Fallo en Autorización de TikTok (OAuth Handshake)</span>
+                      </div>
+                      <p className="text-slate-300">
+                        Se devolvió el siguiente código de error durante el inicio de sesión seguro:
+                      </p>
+                      <div className="bg-slate-950/60 p-2.5 rounded font-mono text-[11px] text-red-300 border border-red-950/80">
+                        Código de Error: <strong className="text-red-400">{tiktokError}</strong>
+                      </div>
+                      <div className="text-slate-400 leading-relaxed text-[11px] space-y-1">
+                        <p className="font-semibold text-slate-300">¿Cómo solucionar el error "{tiktokError}"?</p>
+                        {tiktokError.includes("unauthorized_client") ? (
+                          <p>
+                            Este error ocurre porque la URL desde la que intentas conectar no coincide exactamente con los <strong>Redirect URIs</strong> registrados en tu panel de TikTok Developers, o bien la aplicación se encuentra en modo Sandbox/Staging y tu cuenta de TikTok no ha sido agregada como una cuenta de prueba (Tester Account).
+                          </p>
+                        ) : (
+                          <p>
+                            Verifica que las credenciales (Client Key y Client Secret) de TikTok Developers estén configuradas correctamente en los secretos de tu entorno y que la cuenta de usuario tenga los permisos de perfil aprobados.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {tiktokSuccess && (
+                    <div className="bg-emerald-950/50 border border-emerald-500/40 p-4 rounded-lg flex items-center gap-3 text-emerald-400 animate-fadeIn">
+                      <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" />
+                      <div>
+                        <span className="font-bold text-sm block">Conexión Completada</span>
+                        <span className="text-slate-300 text-xs">Tu cuenta de TikTok se ha vinculado de manera oficial mediante Login Kit.</span>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-2">
                     <p className="font-bold text-cyan-300">Pasos para conectar tu cuenta:</p>
                     <ul className="list-disc list-inside space-y-1 text-slate-400">
@@ -492,6 +946,66 @@ export default function App() {
                       <li>Configura tu Client Key y Client Secret en tus secretos de entorno o `.env`.</li>
                       <li>Genera un código de autorización temporal para conectar el stream.</li>
                     </ul>
+                  </div>
+
+                  {/* Redirection Diagnostic Tool */}
+                  <div className="bg-slate-950/80 border border-slate-850 p-4 rounded-lg space-y-3.5">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-cyan-400" />
+                        <span className="font-bold text-white text-xs">🩺 Validador de Redirección (OAuth Diagnostic Matcher)</span>
+                      </div>
+                      <button
+                        onClick={runTiktokDiagnostics}
+                        disabled={isDiagnosing}
+                        className="px-2.5 py-1 bg-cyan-950 hover:bg-cyan-900 text-cyan-400 border border-cyan-500/20 text-[10px] rounded font-bold cursor-pointer transition flex items-center gap-1"
+                      >
+                        {isDiagnosing ? "Analizando..." : "Ejecutar Análisis"}
+                      </button>
+                    </div>
+
+                    {diagnosticResult ? (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="bg-slate-900/50 p-2.5 rounded border border-slate-800">
+                            <span className="text-[10px] text-slate-400 block font-medium uppercase tracking-wider">Host de Origen (Navegador)</span>
+                            <span className="font-mono text-[11px] text-white block mt-1 truncate">{diagnosticResult.currentHost}</span>
+                          </div>
+                          <div className="bg-slate-900/50 p-2.5 rounded border border-slate-800">
+                            <span className="text-[10px] text-slate-400 block font-medium uppercase tracking-wider">Redirect URI Configurado (Filtro)</span>
+                            <span className="font-mono text-[11px] text-white block mt-1 truncate">{diagnosticResult.redirectUri}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 p-2.5 rounded border text-[11px] font-semibold bg-slate-900/30 border-slate-850">
+                          {diagnosticResult.hostMatches ? (
+                            <>
+                              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                              <span className="text-emerald-400">✅ COINCIDENCIA CORRECTA: Las direcciones del handshake concuerdan.</span>
+                            </>
+                          ) : (
+                            <>
+                              <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+                              <span className="text-red-400">❌ ALERTA DE DISCREPANCIA: El redirect_uri configurado no coincide con tu host actual.</span>
+                            </>
+                          )}
+                        </div>
+
+                        {!diagnosticResult.hostMatches && (
+                          <div className="bg-red-950/20 border border-red-900/40 p-3 rounded text-[11px] text-slate-300 leading-relaxed space-y-1.5">
+                            <p className="font-bold text-red-400">¿Por qué es crítico solucionar esto?</p>
+                            <p>
+                              Para evitar el error de cliente no autorizado (<strong>unauthorized_client</strong>), la consola de desarrollador de TikTok requiere que registres exactamente esta dirección en tu panel de control de desarrolladores:
+                            </p>
+                            <div className="bg-slate-950/80 p-2 rounded font-mono text-[10px] text-cyan-300 select-all border border-red-950/60 overflow-x-auto">
+                              {diagnosticResult.suggestedRedirect}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-slate-500 text-[11px]">No se han cargado datos de diagnóstico. Haz clic en "Ejecutar Análisis" para iniciar.</p>
+                    )}
                   </div>
 
                   <div className="p-4 bg-cyan-950/30 border border-cyan-500/30 rounded-lg flex items-center justify-between">

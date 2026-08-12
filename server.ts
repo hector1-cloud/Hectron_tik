@@ -558,6 +558,75 @@ function getTiktokRedirectUri(req: any): string {
   return `${protocol}://${host}/api/tiktok/callback`;
 }
 
+app.get("/api/tiktok/inspect", (req, res) => {
+  const { clientKey, clientSecret } = getTiktokCredentials();
+  const redirectUri = getTiktokRedirectUri(req);
+  const state = Math.random().toString(36).substring(2, 15);
+  
+  const diagnostic = {
+    timestamp: new Date().toISOString(),
+    clientKey: clientKey ? `${clientKey.substring(0, 4)}...${clientKey.substring(clientKey.length - 4)}` : "MISSING",
+    clientSecretLength: clientSecret ? clientSecret.length : 0,
+    redirectUri,
+    scopesRequested: "user.info.basic",
+    headersAnalyzed: {
+      host: req.headers.host,
+      xForwardedHost: req.headers["x-forwarded-host"],
+      xForwardedProto: req.headers["x-forwarded-proto"],
+    },
+    suggestedDeveloperPortalSetup: {
+      registeredRedirectUrisRequired: [
+        redirectUri,
+        "https://hectron-streamer-studio-570399074846.us-east1.run.app/api/tiktok/callback"
+      ],
+      registeredClientKeyRequired: clientKey || "awvckv5za3nclqpe"
+    }
+  };
+
+  addServerLog("INFO", "TIKTOK", "TikTok Handshake Inspection requested", diagnostic);
+
+  res.json({
+    status: "success",
+    message: "HECTRON Streamer Studio TikTok Handshake Diagnostic Data",
+    data: diagnostic,
+    launchAuthorizeUrl: `https://www.tiktok.com/v2/auth/authorize/?client_key=${clientKey}&scope=user.info.basic&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`
+  });
+});
+
+// Endpoint to capture and log incoming authorization parameters for debugging unauthorized_client errors
+app.all("/api/debug/tiktok-auth", (req, res) => {
+  const params = {
+    method: req.method,
+    timestamp: new Date().toISOString(),
+    query: req.query,
+    body: req.body,
+    headers: {
+      host: req.headers.host,
+      userAgent: req.headers["user-agent"],
+      referer: req.headers.referer,
+      xForwardedFor: req.headers["x-forwarded-for"],
+      xForwardedProto: req.headers["x-forwarded-proto"]
+    }
+  };
+
+  addServerLog("DEBUG", "TIKTOK", "TikTok Auth Handshake Parameters Logged", params);
+  console.log("=== [DEBUG TIKTOK AUTH PARAMETERS] ===");
+  console.log(JSON.stringify(params, null, 2));
+  console.log("=======================================");
+
+  res.json({
+    status: "success",
+    message: "TikTok auth parameters captured and logged successfully.",
+    capturedParameters: {
+      client_key: req.query.client_key || req.body.client_key || "Not provided",
+      redirect_uri: req.query.redirect_uri || req.body.redirect_uri || "Not provided",
+      scopes: req.query.scope || req.body.scope || req.query.scopes || req.body.scopes || "Not provided",
+      state: req.query.state || req.body.state || "Not provided",
+      response_type: req.query.response_type || req.body.response_type || "Not provided"
+    }
+  });
+});
+
 app.get("/api/tiktok/login", (req, res) => {
   const { clientKey } = getTiktokCredentials();
   const redirectUri = getTiktokRedirectUri(req);
