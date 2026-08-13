@@ -9,6 +9,8 @@ import { LogsView } from "./components/LogsView";
 import { PerformanceView } from "./components/PerformanceView";
 import { AutonomyMetricsView } from "./components/AutonomyMetricsView";
 import { AndroidFirebaseValidator } from "./components/AndroidFirebaseValidator";
+import { TiktokDnsGuide } from "./components/TiktokDnsGuide";
+import { TiktokTokenExchange } from "./components/TiktokTokenExchange";
 import { jsPDF } from "jspdf";
 import {
   Mic,
@@ -25,6 +27,7 @@ import {
   Terminal,
   Activity,
   Smartphone,
+  Globe,
   Copy,
   Check,
   Image,
@@ -82,7 +85,7 @@ const downloadImageAsPDF = async (imageSrc: string, pdfFileName: string) => {
 
 export default function App() {
   const [previewType, setPreviewType] = useState<"interactive" | "sketchfab">("interactive");
-  const [tiktokSubTab, setTiktokSubTab] = useState<"web" | "android" | "mockups">("web");
+  const [tiktokSubTab, setTiktokSubTab] = useState<"web" | "dns" | "android" | "mockups">("web");
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [isDownloading1, setIsDownloading1] = useState(false);
   const [isDownloading2, setIsDownloading2] = useState(false);
@@ -914,42 +917,59 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Subtabs for Web & Android SDK */}
+              {/* Subtabs for Web, DNS Verification, Android SDK & Mockups */}
               <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-850 text-xs gap-1">
                 <button
                   onClick={() => setTiktokSubTab("web")}
-                  className={`flex-1 py-2.5 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-2 ${
+                  className={`flex-1 py-2.5 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-1.5 ${
                     tiktokSubTab === "web"
                       ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
                       : "text-slate-400 hover:text-slate-200"
                   }`}
                 >
                   <Tv className="w-3.5 h-3.5" />
-                  <span>Conexión Web (Login Kit)</span>
+                  <span>Conexión Web</span>
+                </button>
+                <button
+                  onClick={() => setTiktokSubTab("dns")}
+                  className={`flex-1 py-2.5 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+                    tiktokSubTab === "dns"
+                      ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>Verificación DNS TXT</span>
                 </button>
                 <button
                   onClick={() => setTiktokSubTab("android")}
-                  className={`flex-1 py-2.5 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-2 ${
+                  className={`flex-1 py-2.5 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-1.5 ${
                     tiktokSubTab === "android"
                       ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
                       : "text-slate-400 hover:text-slate-200"
                   }`}
                 >
                   <Smartphone className="w-3.5 h-3.5" />
-                  <span>Android Companion SDK</span>
+                  <span>Android SDK</span>
                 </button>
                 <button
                   onClick={() => setTiktokSubTab("mockups")}
-                  className={`flex-1 py-2.5 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-2 ${
+                  className={`flex-1 py-2.5 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-1.5 ${
                     tiktokSubTab === "mockups"
                       ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
                       : "text-slate-400 hover:text-slate-200"
                   }`}
                 >
                   <Image className="w-3.5 h-3.5" />
-                  <span>Maquetas de UX (Revisión)</span>
+                  <span>Maquetas UX</span>
                 </button>
               </div>
+
+              {tiktokSubTab === "dns" && (
+                <div className="animate-fadeIn">
+                  <TiktokDnsGuide />
+                </div>
+              )}
 
               {tiktokSubTab === "web" && (
                 <div className="space-y-4 text-xs text-slate-300">
@@ -996,9 +1016,25 @@ export default function App() {
                     <ul className="list-disc list-inside space-y-1 text-slate-400">
                       <li>Registra una aplicación en el portal de desarrolladores de TikTok.</li>
                       <li>Configura tu Client Key y Client Secret en tus secretos de entorno o `.env`.</li>
-                      <li>Genera un código de autorización temporal para conectar el stream.</li>
+                      <li>Verifica la propiedad de tu dominio ante TikTok mediante el registro DNS TXT.</li>
                     </ul>
+                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                      <span className="text-[11px] text-slate-300 flex items-center gap-1.5 font-medium">
+                        <Globe className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Verificación de sitio en TikTok (hekron-tik.vercel.app)</span>
+                      </span>
+                      <button
+                        onClick={() => setTiktokSubTab("dns")}
+                        className="px-2.5 py-1 bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/30 rounded text-[10px] font-bold cursor-pointer transition flex items-center gap-1"
+                      >
+                        <span>Ver Guía DNS Completa</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Robust Exponential Backoff Token Exchange Engine */}
+                  <TiktokTokenExchange />
 
                   {/* Redirection Diagnostic Tool */}
                   <div className="bg-slate-950/80 border border-slate-850 p-4 rounded-lg space-y-3.5">
