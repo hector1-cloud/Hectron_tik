@@ -1,7 +1,7 @@
 export type Emotion = 'HAPPY' | 'SAD' | 'ANGRY' | 'SURPRISE' | 'FLIRT' | 'IDLE';
 
 export type LogLevel = 'INFO' | 'WARN' | 'ERROR' | 'DEBUG';
-export type LogScope = 'SERVER' | 'FRONTEND' | 'AGENT' | 'TIKTOK' | '3D';
+export type LogScope = 'SERVER' | 'FRONTEND' | 'AGENT' | 'TIKTOK' | '3D' | 'WORKFLOW';
 
 export interface LogEntry {
   id: string;
@@ -66,8 +66,8 @@ export interface BrainContextType {
   setTiktokConnected: (val: boolean) => void;
   messages: ChatMessage[];
   addMessage: (msg: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
-  activeTab: 'dashboard' | 'overlay' | 'agent' | 'tiktok' | 'logs' | 'performance';
-  setActiveTab: (tab: 'dashboard' | 'overlay' | 'agent' | 'tiktok' | 'logs' | 'performance') => void;
+  activeTab: 'dashboard' | 'overlay' | 'agent' | 'tiktok' | 'logs' | 'performance' | 'autonomy' | 'workers-ai' | 'workflows';
+  setActiveTab: (tab: 'dashboard' | 'overlay' | 'agent' | 'tiktok' | 'logs' | 'performance' | 'autonomy' | 'workers-ai' | 'workflows') => void;
   speakText: (text: string, emotion?: Emotion) => Promise<void>;
   latestSpeechText: string;
   isSpeaking: boolean;

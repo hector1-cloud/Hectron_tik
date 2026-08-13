@@ -11,6 +11,8 @@ import { AutonomyMetricsView } from "./components/AutonomyMetricsView";
 import { AndroidFirebaseValidator } from "./components/AndroidFirebaseValidator";
 import { TiktokDnsGuide } from "./components/TiktokDnsGuide";
 import { TiktokTokenExchange } from "./components/TiktokTokenExchange";
+import { WorkersAiRunner } from "./components/WorkersAiRunner";
+import { CloudflareWorkflowsRunner } from "./components/CloudflareWorkflowsRunner";
 import { jsPDF } from "jspdf";
 import {
   Mic,
@@ -20,9 +22,11 @@ import {
   Music2,
   Database,
   Sparkles,
+  GitFork,
   ExternalLink,
   Bot,
   Volume2,
+  Cpu,
   HelpCircle,
   Terminal,
   Activity,
@@ -703,6 +707,30 @@ export default function App() {
               <Music2 className="w-4 h-4" />
               <span>TikTok LIVE</span>
             </button>
+
+            <button
+              onClick={() => setActiveTab("workers-ai")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                activeTab === "workers-ai"
+                  ? "bg-orange-500 text-slate-950 shadow-md shadow-orange-500/20"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Cpu className="w-4 h-4" />
+              <span>Workers AI</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("workflows")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                activeTab === "workflows"
+                  ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <GitFork className="w-4 h-4" />
+              <span>Workflows</span>
+            </button>
           </nav>
 
           {/* Status Badges */}
@@ -973,6 +1001,42 @@ export default function App() {
 
               {tiktokSubTab === "web" && (
                 <div className="space-y-4 text-xs text-slate-300">
+                  {/* Primary TikTok OAuth Login Button Card (PKCE Standard) */}
+                  <div className="bg-slate-950 p-5 rounded-xl border border-cyan-500/30 space-y-3.5 shadow-lg relative overflow-hidden">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-white">TikTok Login Kit for Web/Desktop</span>
+                          <span className="px-2 py-0.5 bg-cyan-950 text-cyan-400 font-mono text-[10px] rounded border border-cyan-500/30">
+                            PKCE (S256) Activo
+                          </span>
+                        </div>
+                        <p className="text-slate-400 text-xs mt-1">
+                          Inicia sesión con tu cuenta de TikTok mediante el flujo seguro con Proof Key for Code Exchange (PKCE).
+                        </p>
+                      </div>
+
+                      <a
+                        href="/api/tiktok/login"
+                        className="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs rounded-lg transition-all shadow-lg shadow-cyan-500/20 hover:scale-[1.02] flex items-center justify-center gap-2 cursor-pointer border border-cyan-300/40 shrink-0"
+                      >
+                        <Music2 className="w-4 h-4 text-slate-950" />
+                        <span>Continue with TikTok</span>
+                        <ExternalLink className="w-3.5 h-3.5 text-slate-950" />
+                      </a>
+                    </div>
+
+                    <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800 text-[11px] font-mono text-slate-300 space-y-1">
+                      <div className="text-slate-400 font-sans font-bold flex items-center gap-1.5 text-xs text-cyan-300 border-b border-slate-800 pb-1.5 mb-2">
+                        <span>Parámetros de Integración Real (TikTok Developers)</span>
+                      </div>
+                      <div><span className="text-slate-500">Client Key:</span> <code className="text-cyan-300">awvckv5za3nclqpe</code></div>
+                      <div><span className="text-slate-500">Scope:</span> <code className="text-emerald-400">user.info.basic</code></div>
+                      <div><span className="text-slate-500">Redirect URI:</span> <code className="text-cyan-300">{window.location.origin}/api/tiktok/callback</code></div>
+                      <div><span className="text-slate-500">Challenge Method:</span> <code className="text-cyan-300">S256 (SHA-256 Hex)</code></div>
+                    </div>
+                  </div>
+
                   {/* OAuth Handshake Error / Success Alerts */}
                   {tiktokError && (
                     <div className="bg-red-950/50 border border-red-500/40 p-4 rounded-lg space-y-2 animate-fadeIn">
@@ -1367,6 +1431,9 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {activeTab === "workers-ai" && <WorkersAiRunner />}
+        {activeTab === "workflows" && <CloudflareWorkflowsRunner />}
       </main>
 
       {/* Footer */}

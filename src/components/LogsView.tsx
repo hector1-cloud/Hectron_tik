@@ -62,6 +62,7 @@ export function LogsView() {
       AGENT: "bg-indigo-950/80 text-indigo-300 border-indigo-800",
       TIKTOK: "bg-pink-950/80 text-pink-300 border-pink-800",
       "3D": "bg-cyan-950/80 text-cyan-300 border-cyan-800",
+      WORKFLOW: "bg-orange-950/80 text-orange-300 border-orange-800",
     };
     return (
       <span className={`px-2 py-0.5 rounded text-[10px] font-mono border ${colors[scope] || 'bg-slate-800 text-slate-300'}`}>

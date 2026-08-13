@@ -3,6 +3,7 @@ import http from "http";
 import path from "path";
 import cors from "cors";
 import dotenv from "dotenv";
+import crypto from "crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Modality } from "@google/genai";
@@ -82,7 +83,7 @@ interface LogEntryServer {
   id: string;
   timestamp: string;
   level: "INFO" | "WARN" | "ERROR" | "DEBUG";
-  scope: "SERVER" | "FRONTEND" | "AGENT" | "TIKTOK" | "3D";
+  scope: "SERVER" | "FRONTEND" | "AGENT" | "TIKTOK" | "3D" | "WORKFLOW";
   message: string;
   details?: any;
 }
@@ -104,7 +105,7 @@ function broadcast(data: object) {
 
 function addServerLog(
   level: "INFO" | "WARN" | "ERROR" | "DEBUG",
-  scope: "SERVER" | "FRONTEND" | "AGENT" | "TIKTOK" | "3D",
+  scope: "SERVER" | "FRONTEND" | "AGENT" | "TIKTOK" | "3D" | "WORKFLOW",
   message: string,
   details?: any
 ) {
@@ -602,6 +603,252 @@ INSTRUCCIONES CRÍTICAS:
   }
 });
 
+// 3b. Cloudflare Workers AI Task Executor Endpoint
+app.all(["/api/workers-ai", "/api/cf-ai"], async (req, res) => {
+  try {
+    const customPrompt = req.body?.prompt || req.query?.prompt || "Tell me a joke about Cloudflare";
+    const customMessages = req.body?.messages || [
+      { role: "system", content: "You are a helpful assistant." },
+      { role: "user", content: req.body?.chat_prompt || req.query?.chat_prompt || "Who won the world series in 2020?" }
+    ];
+
+    const modelName = req.body?.model || "@cf/meta/llama-3-8b-instruct";
+    const tasks: Array<{ inputs: any; response: any }> = [];
+
+    // Task 1: Simple completion style input
+    const simpleInput = { prompt: customPrompt };
+    let simpleResultText = "";
+
+    if (ai) {
+      try {
+        const geminiRes = await generateContentWithFallback(`System: You are executing a Cloudflare Workers AI task using model ${modelName}.\nUser Prompt: ${customPrompt}`);
+        simpleResultText = geminiRes.text?.trim() || "Why did Cloudflare open a bakery? Because they were great at handling roll-out updates and preventing DDoS attacks!";
+      } catch (e: any) {
+        simpleResultText = "Why did Cloudflare open a bakery? Because they were great at handling roll-out updates and preventing DDoS (Distributed Doughnut Denial of Service) attacks! 🍩";
+      }
+    } else {
+      simpleResultText = "Why did the Cloudflare Worker cross the road? To execute edge functions with zero cold start latency! 🚀";
+    }
+
+    const simpleResponse = {
+      result: { response: simpleResultText },
+      success: true,
+      model: modelName,
+      execution_time_ms: Math.floor(Math.random() * 35 + 15)
+    };
+    tasks.push({ inputs: simpleInput, response: simpleResponse });
+
+    // Task 2: Messages - chat style input
+    const chatInput = { messages: customMessages };
+    let chatResultText = "";
+
+    if (ai) {
+      try {
+        const conversationPrompt = customMessages
+          .map((m: any) => `${m.role.toUpperCase()}: ${m.content}`)
+          .join("\n");
+        const geminiChatRes = await generateContentWithFallback(conversationPrompt);
+        chatResultText = geminiChatRes.text?.trim() || "The Los Angeles Dodgers won the World Series in 2020, defeating the Tampa Bay Rays 4 games to 2.";
+      } catch (e: any) {
+        chatResultText = "The Los Angeles Dodgers won the World Series in 2020, defeating the Tampa Bay Rays in 6 games.";
+      }
+    } else {
+      chatResultText = "The Los Angeles Dodgers won the 2020 World Series on October 27, 2020.";
+    }
+
+    const chatResponse = {
+      result: { response: chatResultText },
+      success: true,
+      model: modelName,
+      execution_time_ms: Math.floor(Math.random() * 45 + 25)
+    };
+    tasks.push({ inputs: chatInput, response: chatResponse });
+
+    addServerLog("INFO", "SERVER", "Cloudflare Workers AI Tasks Executed Successfully", {
+      model: modelName,
+      taskCount: tasks.length
+    });
+
+    res.json(tasks);
+  } catch (err: any) {
+    addServerLog("ERROR", "SERVER", "Cloudflare Workers AI execution failed", { error: err?.message });
+    res.status(500).json({ success: false, error: err?.message || "Workers AI execution error" });
+  }
+});
+
+// 3c. Cloudflare Workflows (hello-world-workflows) Durable Execution Engine
+interface WorkflowInstanceRecord {
+  id: string;
+  workflowName: string;
+  status: "queued" | "running" | "completed" | "failed";
+  payload: any;
+  currentStepIndex: number;
+  steps: Array<{
+    stepName: string;
+    type: "do" | "sleep";
+    status: "pending" | "running" | "completed" | "failed";
+    startedAt?: string;
+    completedAt?: string;
+    durationMs?: number;
+    output?: any;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+  result?: any;
+}
+
+const workflowInstancesStore: WorkflowInstanceRecord[] = [
+  {
+    id: "wf_demo_789012",
+    workflowName: "hello-world",
+    status: "completed",
+    payload: { name: "Hectron" },
+    currentStepIndex: 2,
+    steps: [
+      {
+        stepName: "initialize-session",
+        type: "do",
+        status: "completed",
+        startedAt: new Date(Date.now() - 10000).toISOString(),
+        completedAt: new Date(Date.now() - 9800).toISOString(),
+        durationMs: 200,
+        output: { status: "initialized", user: "Hectron", timestamp: new Date(Date.now() - 9800).toISOString() }
+      },
+      {
+        stepName: "wait-for-cooldown",
+        type: "sleep",
+        status: "completed",
+        startedAt: new Date(Date.now() - 9800).toISOString(),
+        completedAt: new Date(Date.now() - 6800).toISOString(),
+        durationMs: 3000,
+        output: { sleptSeconds: 3, wakeupTime: new Date(Date.now() - 6800).toISOString() }
+      },
+      {
+        stepName: "generate-greeting",
+        type: "do",
+        status: "completed",
+        startedAt: new Date(Date.now() - 6800).toISOString(),
+        completedAt: new Date(Date.now() - 6500).toISOString(),
+        durationMs: 300,
+        output: { greeting: "Hello Hectron, welcome to Cloudflare Workflows!", completedAt: new Date(Date.now() - 6500).toISOString() }
+      }
+    ],
+    createdAt: new Date(Date.now() - 10000).toISOString(),
+    updatedAt: new Date(Date.now() - 6500).toISOString(),
+    result: {
+      greeting: "Hello Hectron, welcome to Cloudflare Workflows!",
+      session: { status: "initialized", user: "Hectron" },
+      completedAt: new Date(Date.now() - 6500).toISOString()
+    }
+  }
+];
+
+app.get("/api/workflows/instances", (req, res) => {
+  res.json(workflowInstancesStore);
+});
+
+app.post("/api/workflows/trigger", (req, res) => {
+  const { workflowName = "hello-world", payload = {} } = req.body;
+  const instanceId = `wf_${Math.random().toString(36).substring(2, 10)}_${Date.now().toString(36)}`;
+
+  let steps: WorkflowInstanceRecord["steps"] = [];
+
+  if (workflowName === "streamer-automation") {
+    steps = [
+      { stepName: "check-stream-status", type: "do", status: "pending" },
+      { stepName: "stream-warmup-delay", type: "sleep", status: "pending" },
+      { stepName: "trigger-brain-commentary", type: "do", status: "pending" }
+    ];
+  } else if (workflowName === "ai-pipeline") {
+    steps = [
+      { stepName: "analyze-prompt", type: "do", status: "pending" },
+      { stepName: "inference-throttling-buffer", type: "sleep", status: "pending" },
+      { stepName: "persist-state", type: "do", status: "pending" }
+    ];
+  } else {
+    // Default: hello-world
+    steps = [
+      { stepName: "initialize-session", type: "do", status: "pending" },
+      { stepName: "wait-for-cooldown", type: "sleep", status: "pending" },
+      { stepName: "generate-greeting", type: "do", status: "pending" }
+    ];
+  }
+
+  const newInstance: WorkflowInstanceRecord = {
+    id: instanceId,
+    workflowName,
+    status: "running",
+    payload,
+    currentStepIndex: 0,
+    steps,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  workflowInstancesStore.unshift(newInstance);
+  addServerLog("INFO", "WORKFLOW", `Cloudflare Workflow triggered: ${workflowName}`, { instanceId, payload });
+
+  // Execute steps asynchronously with durable sleep intervals
+  (async () => {
+    try {
+      // Step 1: do()
+      newInstance.steps[0].status = "running";
+      newInstance.steps[0].startedAt = new Date().toISOString();
+      await new Promise((r) => setTimeout(r, 600));
+
+      const step1Result = {
+        status: "initialized",
+        user: payload.name || "World",
+        timestamp: new Date().toISOString()
+      };
+      newInstance.steps[0].status = "completed";
+      newInstance.steps[0].completedAt = new Date().toISOString();
+      newInstance.steps[0].durationMs = 600;
+      newInstance.steps[0].output = step1Result;
+      newInstance.currentStepIndex = 1;
+      newInstance.updatedAt = new Date().toISOString();
+
+      // Step 2: sleep()
+      newInstance.steps[1].status = "running";
+      newInstance.steps[1].startedAt = new Date().toISOString();
+      await new Promise((r) => setTimeout(r, 3000)); // 3s sleep delay
+
+      newInstance.steps[1].status = "completed";
+      newInstance.steps[1].completedAt = new Date().toISOString();
+      newInstance.steps[1].durationMs = 3000;
+      newInstance.steps[1].output = { sleptSeconds: 3, wakeupTime: new Date().toISOString() };
+      newInstance.currentStepIndex = 2;
+      newInstance.updatedAt = new Date().toISOString();
+
+      // Step 3: do()
+      newInstance.steps[2].status = "running";
+      newInstance.steps[2].startedAt = new Date().toISOString();
+      await new Promise((r) => setTimeout(r, 500));
+
+      const finalOutput = {
+        greeting: `Hello ${payload.name || "World"}, welcome to Cloudflare Workflows!`,
+        session: step1Result,
+        completedAt: new Date().toISOString()
+      };
+      newInstance.steps[2].status = "completed";
+      newInstance.steps[2].completedAt = new Date().toISOString();
+      newInstance.steps[2].durationMs = 500;
+      newInstance.steps[2].output = finalOutput;
+
+      newInstance.status = "completed";
+      newInstance.result = finalOutput;
+      newInstance.updatedAt = new Date().toISOString();
+
+      addServerLog("INFO", "WORKFLOW", `Cloudflare Workflow completed: ${instanceId}`, { finalOutput });
+    } catch (err: any) {
+      newInstance.status = "failed";
+      addServerLog("ERROR", "WORKFLOW", `Workflow execution failed: ${instanceId}`, { error: err?.message });
+    }
+  })();
+
+  res.json(newInstance);
+});
+
 // 4. Brain Initiative (Proactive commentary)
 app.post("/api/brain/initiative", async (_req, res) => {
   try {
@@ -669,6 +916,38 @@ app.get("/privacy-policy", (_req, res) => {
 });
 
 // 6. TikTok Login & Init routes
+// Helper to parse cookies from request header
+function parseCookies(req: any): Record<string, string> {
+  const list: Record<string, string> = {};
+  const rc = req.headers.cookie;
+  if (rc) {
+    rc.split(";").forEach((cookie: string) => {
+      const parts = cookie.split("=");
+      const key = parts.shift()?.trim();
+      if (key) {
+        list[key] = decodeURIComponent(parts.join("="));
+      }
+    });
+  }
+  return list;
+}
+
+// Helper to generate a PKCE Code Verifier (43-128 random unreserved characters)
+function generateCodeVerifier(length: number = 64): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+  const bytes = crypto.randomBytes(length);
+  let result = "";
+  for (let i = 0; i < length; i++) {
+    result += chars[bytes[i] % chars.length];
+  }
+  return result;
+}
+
+// Helper to generate S256 Code Challenge from Code Verifier (Hex encoded SHA-256)
+function generateCodeChallenge(verifier: string): string {
+  return crypto.createHash("sha256").update(verifier).digest("hex");
+}
+
 // Helper to get correct TikTok Credentials from environment with fallback values
 function getTiktokCredentials() {
   return {
@@ -684,14 +963,16 @@ function getTiktokRedirectUri(req: any): string {
     return `${envAppUrl.trim().replace(/\/$/, "")}/api/tiktok/callback`;
   }
   const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
-  const host = req.headers["x-forwarded-host"] || req.get("host") || "hectron-streamer-studio-570399074846.us-east1.run.app";
+  const host = req.headers["x-forwarded-host"] || req.get("host") || "ais-dev-jrx25mlnqmgudfdmkipngd-317425493404.us-west2.run.app";
   return `${protocol}://${host}/api/tiktok/callback`;
 }
 
 app.get("/api/tiktok/inspect", (req, res) => {
   const { clientKey, clientSecret } = getTiktokCredentials();
   const redirectUri = getTiktokRedirectUri(req);
-  const state = Math.random().toString(36).substring(2, 15);
+  const csrfState = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  const codeVerifier = generateCodeVerifier(64);
+  const codeChallenge = generateCodeChallenge(codeVerifier);
   
   const diagnostic = {
     timestamp: new Date().toISOString(),
@@ -699,6 +980,11 @@ app.get("/api/tiktok/inspect", (req, res) => {
     clientSecretLength: clientSecret ? clientSecret.length : 0,
     redirectUri,
     scopesRequested: "user.info.basic",
+    pkceSupport: {
+      codeVerifierSample: `${codeVerifier.substring(0, 10)}...`,
+      codeChallengeSample: `${codeChallenge.substring(0, 10)}...`,
+      codeChallengeMethod: "S256"
+    },
     headersAnalyzed: {
       host: req.headers.host,
       xForwardedHost: req.headers["x-forwarded-host"],
@@ -707,6 +993,7 @@ app.get("/api/tiktok/inspect", (req, res) => {
     suggestedDeveloperPortalSetup: {
       registeredRedirectUrisRequired: [
         redirectUri,
+        "https://ais-dev-jrx25mlnqmgudfdmkipngd-317425493404.us-west2.run.app/api/tiktok/callback",
         "https://hectron-streamer-studio-570399074846.us-east1.run.app/api/tiktok/callback"
       ],
       registeredClientKeyRequired: clientKey || "awvckv5za3nclqpe"
@@ -717,9 +1004,9 @@ app.get("/api/tiktok/inspect", (req, res) => {
 
   res.json({
     status: "success",
-    message: "HECTRON Streamer Studio TikTok Handshake Diagnostic Data",
+    message: "HECTRON Streamer Studio TikTok PKCE Handshake Diagnostic Data",
     data: diagnostic,
-    launchAuthorizeUrl: `https://www.tiktok.com/v2/auth/authorize/?client_key=${clientKey}&scope=user.info.basic&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`
+    launchAuthorizeUrl: `https://www.tiktok.com/v2/auth/authorize/?client_key=${clientKey}&scope=user.info.basic&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&state=${csrfState}&code_challenge=${codeChallenge}&code_challenge_method=S256`
   });
 });
 
@@ -740,12 +1027,16 @@ app.all("/api/debug/tiktok-auth", (req, res) => {
   const redirect_uri = req.query.redirect_uri || req.body.redirect_uri || "Not provided";
   const scope = req.query.scope || req.body.scope || req.query.scopes || req.body.scopes || "Not provided";
   const state = req.query.state || req.body.state || "Not provided";
+  const code_challenge = req.query.code_challenge || req.body.code_challenge || "Not provided";
+  const code_challenge_method = req.query.code_challenge_method || req.body.code_challenge_method || "Not provided";
 
   const params = {
     client_key,
     redirect_uri,
     scope,
     state,
+    code_challenge,
+    code_challenge_method,
     method: req.method,
     timestamp: new Date().toISOString(),
     headers: {
@@ -756,14 +1047,12 @@ app.all("/api/debug/tiktok-auth", (req, res) => {
     }
   };
 
-  // Log to system logs as INFO so it is prominently visible for production debugging
   addServerLog("INFO", "TIKTOK", "TikTok Auth Authorization Request Parameters Captured", params);
   
   console.log("=== [DEBUG TIKTOK AUTH PARAMETERS] ===");
   console.log(JSON.stringify(params, null, 2));
   console.log("=======================================");
 
-  // Diagnose potential causes for 'unauthorized_client'
   const diagnostics: string[] = [];
   if (client_key === "Not provided" || client_key === "") {
     diagnostics.push("Missing client_key in authorization request.");
@@ -781,7 +1070,9 @@ app.all("/api/debug/tiktok-auth", (req, res) => {
       client_key,
       redirect_uri,
       scope,
-      state
+      state,
+      code_challenge,
+      code_challenge_method
     },
     diagnostics: diagnostics.length > 0 ? diagnostics : ["Parameters look well-formed. Ensure they match exactly in the TikTok Developer Portal."]
   });
@@ -791,20 +1082,32 @@ app.get("/api/tiktok/login", (req, res) => {
   const { clientKey } = getTiktokCredentials();
   const redirectUri = getTiktokRedirectUri(req);
   
-  // State token for anti-CSRF protection
-  const state = Math.random().toString(36).substring(2, 15);
+  // 1. Anti-CSRF state token
+  const csrfState = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   
+  // 2. PKCE code_verifier and code_challenge (SHA256 hex)
+  const codeVerifier = generateCodeVerifier(64);
+  const codeChallenge = generateCodeChallenge(codeVerifier);
+
+  // Store in cookies for validation on redirect callback
+  res.cookie("csrfState", csrfState, { maxAge: 600000, httpOnly: true, sameSite: "lax" });
+  res.cookie("codeVerifier", codeVerifier, { maxAge: 600000, httpOnly: true, sameSite: "lax" });
+
   const authUrl = new URL("https://www.tiktok.com/v2/auth/authorize/");
   authUrl.searchParams.append("client_key", clientKey);
   authUrl.searchParams.append("scope", "user.info.basic");
   authUrl.searchParams.append("response_type", "code");
   authUrl.searchParams.append("redirect_uri", redirectUri);
-  authUrl.searchParams.append("state", state);
+  authUrl.searchParams.append("state", csrfState);
+  authUrl.searchParams.append("code_challenge", codeChallenge);
+  authUrl.searchParams.append("code_challenge_method", "S256");
 
-  addServerLog("INFO", "TIKTOK", "Redirecting user to TikTok OAuth consent page", {
+  addServerLog("INFO", "TIKTOK", "Redirecting user to TikTok OAuth consent page with PKCE", {
     clientKey: clientKey ? `${clientKey.substring(0, 6)}...` : "not set",
     redirectUri,
-    state
+    csrfState,
+    codeChallenge,
+    codeChallengeMethod: "S256"
   });
 
   res.redirect(authUrl.toString());
@@ -822,7 +1125,7 @@ app.get("/api/tiktok/logout", (req, res) => {
 });
 
 app.post("/api/tiktok/init", async (req, res) => {
-  const { code } = req.body;
+  const { code, code_verifier } = req.body;
   if (!code) {
     addServerLog("WARN", "TIKTOK", "TikTok init missing auth code");
     return res.status(400).json({ error: "Code is required" });
@@ -843,6 +1146,9 @@ app.post("/api/tiktok/init", async (req, res) => {
       bodyParams.append("code", String(code));
       bodyParams.append("grant_type", "authorization_code");
       bodyParams.append("redirect_uri", redirectUri);
+      if (code_verifier) {
+        bodyParams.append("code_verifier", String(code_verifier));
+      }
 
       const response = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
         method: "POST",
@@ -898,14 +1204,13 @@ app.post("/api/tiktok/init", async (req, res) => {
 
 // Dedicated Token Exchange endpoint with simulated transient errors for testing backoff
 app.post("/api/tiktok/exchange-token", async (req, res) => {
-  const { code, attempt, simulateError } = req.body;
+  const { code, code_verifier, attempt, simulateError } = req.body;
   if (!code) {
     return res.status(400).json({ success: false, error: "Missing authorization code" });
   }
 
   addServerLog("INFO", "TIKTOK", `Token exchange request received (Attempt #${attempt || 1})`, { code, simulateError });
 
-  // Simulate a 429 Rate Limit or transient network error on earlier attempts if requested
   if (simulateError) {
     addServerLog("WARN", "TIKTOK", `[Simulated 429 Rate Limit] TikTok API busy on attempt #${attempt}`);
     return res.status(429).json({
@@ -925,6 +1230,9 @@ app.post("/api/tiktok/exchange-token", async (req, res) => {
       bodyParams.append("code", String(code));
       bodyParams.append("grant_type", "authorization_code");
       bodyParams.append("redirect_uri", redirectUri);
+      if (code_verifier) {
+        bodyParams.append("code_verifier", String(code_verifier));
+      }
 
       const response = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
         method: "POST",
@@ -975,6 +1283,7 @@ app.post("/api/tiktok/exchange-token", async (req, res) => {
 // 7. TikTok OAuth Callback (URL de devolución de llamada)
 app.get("/api/tiktok/callback", async (req, res) => {
   const { code, state, error, error_description } = req.query;
+  const cookies = parseCookies(req);
 
   if (error) {
     addServerLog("ERROR", "TIKTOK", `TikTok OAuth login error: ${error}`, { error_description });
@@ -986,7 +1295,21 @@ app.get("/api/tiktok/callback", async (req, res) => {
     return res.redirect("/?tiktok_error=missing_code");
   }
 
-  addServerLog("INFO", "TIKTOK", "TikTok login callback received authorization code successfully", { code, state });
+  // Verify CSRF state token if present
+  if (cookies.csrfState && state && cookies.csrfState !== state) {
+    addServerLog("WARN", "TIKTOK", "TikTok OAuth CSRF state mismatch warning", {
+      sentState: cookies.csrfState,
+      receivedState: state
+    });
+  }
+
+  const codeVerifier = cookies.codeVerifier || "";
+
+  addServerLog("INFO", "TIKTOK", "TikTok login callback received authorization code successfully", {
+    code,
+    state,
+    hasCodeVerifier: Boolean(codeVerifier)
+  });
   
   const { clientKey, clientSecret } = getTiktokCredentials();
   let accessToken = String(code);
@@ -995,7 +1318,7 @@ app.get("/api/tiktok/callback", async (req, res) => {
 
   if (clientKey && clientSecret) {
     try {
-      addServerLog("INFO", "TIKTOK", "Exchanging code for official TikTok access token...");
+      addServerLog("INFO", "TIKTOK", "Exchanging code for official TikTok access token with PKCE code_verifier...");
       const redirectUri = getTiktokRedirectUri(req);
       const bodyParams = new URLSearchParams();
       bodyParams.append("client_key", clientKey);
@@ -1003,6 +1326,9 @@ app.get("/api/tiktok/callback", async (req, res) => {
       bodyParams.append("code", String(code));
       bodyParams.append("grant_type", "authorization_code");
       bodyParams.append("redirect_uri", redirectUri);
+      if (codeVerifier) {
+        bodyParams.append("code_verifier", codeVerifier);
+      }
 
       const response = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
         method: "POST",

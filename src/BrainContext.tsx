@@ -15,7 +15,7 @@ export function BrainProvider({ children }: { children: ReactNode }) {
   const [emotion, setEmotion] = useState<Emotion>("HAPPY");
   const [isAutonomous, setIsAutonomous] = useState<boolean>(true);
   const [tiktokConnected, setTiktokConnected] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "overlay" | "agent" | "tiktok" | "logs" | "performance">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "overlay" | "agent" | "tiktok" | "logs" | "performance" | "autonomy" | "workers-ai" | "workflows">("dashboard");
 
   // LOD & FPS state for 3D optimization
   const [lodLevel, setLodLevel] = useState<"HIGH" | "MEDIUM" | "LOW">("HIGH");
