@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    match /chat_logs/{chatId} {
+      allow read: if true;
+      allow create: if true;
+    }
+
+    match /psyche_state/{stateId} {
+      allow read: if true;
+      allow create, update: if true;
+    }
+
+    match /autonomous_decisions/{decisionId} {
+      allow read: if true;
+      allow create: if true;
+    }
+
+    match /user_metrics/{metricId} {
+      allow read: if true;
+      allow create, update: if true;
+    }
+  }
+}

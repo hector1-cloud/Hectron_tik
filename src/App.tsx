@@ -1,4 +1,5 @@
 import { useContext, useState, useEffect } from "react";
+import { testFirestoreConnection } from "./lib/firebase";
 import { BrainContext } from "./BrainContext";
 import { LiveControl } from "./components/LiveControl";
 import { SceneSelector } from "./components/SceneSelector";
@@ -7,6 +8,7 @@ import { Overlay } from "./components/Overlay";
 import { LogsView } from "./components/LogsView";
 import { PerformanceView } from "./components/PerformanceView";
 import { AutonomyMetricsView } from "./components/AutonomyMetricsView";
+import { AndroidFirebaseValidator } from "./components/AndroidFirebaseValidator";
 import { jsPDF } from "jspdf";
 import {
   Mic,
@@ -493,6 +495,10 @@ export default function App() {
     suggestedRedirect: string;
   } | null>(null);
   const [isDiagnosing, setIsDiagnosing] = useState(false);
+
+  useEffect(() => {
+    testFirestoreConnection();
+  }, []);
 
   // Helper para espera de tiempo (delay)
   const waitMs = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1111,6 +1117,9 @@ export default function App() {
 
               {tiktokSubTab === "android" && (
                 <div className="space-y-5 text-xs text-slate-300 animate-fadeIn">
+                  {/* Validation Component for Android SDK & Firebase google-services.json */}
+                  <AndroidFirebaseValidator />
+
                   {/* Android Quickstart Header */}
                   <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-3">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">

@@ -1,0 +1,75 @@
+{
+  "entities": {
+    "ChatLog": {
+      "title": "ChatLog",
+      "description": "Log entry for live stream chat messages",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique message ID" },
+        "username": { "type": "string", "maxLength": 100 },
+        "message": { "type": "string", "maxLength": 1000 },
+        "platform": { "type": "string", "maxLength": 50 },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["username", "message", "timestamp"]
+    },
+    "PsycheState": {
+      "title": "PsycheState",
+      "description": "Snapshot of Miku's Psyche Matrix (Omega)",
+      "type": "object",
+      "properties": {
+        "machiavellianism": { "type": "number" },
+        "stoicism": { "type": "number" },
+        "creativeDrive": { "type": "number" },
+        "empathy": { "type": "number" },
+        "currentEmotion": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["currentEmotion", "updatedAt"]
+    },
+    "AutonomousDecision": {
+      "title": "AutonomousDecision",
+      "description": "Decision made by the Cerebro Autonomo engine",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "decisionType": { "type": "string", "maxLength": 50 },
+        "scene": { "type": "string", "maxLength": 50 },
+        "emotion": { "type": "string", "maxLength": 50 },
+        "speechText": { "type": "string", "maxLength": 1000 },
+        "confidence": { "type": "number" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["decisionType", "timestamp"]
+    },
+    "UserMetric": {
+      "title": "UserMetric",
+      "description": "Analytics and KPI metrics entry",
+      "type": "object",
+      "properties": {
+        "metricName": { "type": "string", "maxLength": 100 },
+        "value": { "type": "number" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["metricName", "value", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/chat_logs/{chatId}": {
+      "schema": { "$ref": "#/entities/ChatLog" },
+      "description": "Collection of chat log entries"
+    },
+    "/psyche_state/{stateId}": {
+      "schema": { "$ref": "#/entities/PsycheState" },
+      "description": "Collection of psyche matrix state snapshots"
+    },
+    "/autonomous_decisions/{decisionId}": {
+      "schema": { "$ref": "#/entities/AutonomousDecision" },
+      "description": "Collection of autonomous decisions"
+    },
+    "/user_metrics/{metricId}": {
+      "schema": { "$ref": "#/entities/UserMetric" },
+      "description": "Collection of user analytics metrics"
+    }
+  }
+}

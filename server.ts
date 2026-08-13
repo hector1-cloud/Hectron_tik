@@ -723,6 +723,17 @@ app.get("/api/tiktok/inspect", (req, res) => {
   });
 });
 
+// TikTok Domain Site Verification endpoints
+app.get("/tiktok-developers-site-verification=*", (_req, res) => {
+  res.setHeader("Content-Type", "text/plain");
+  res.send("tiktok-developers-site-verification=ThY8KbXDavKHINOcM21wA0B323pSUlHZ");
+});
+
+app.get("/.well-known/tiktok-developers-site-verification.txt", (_req, res) => {
+  res.setHeader("Content-Type", "text/plain");
+  res.send("tiktok-developers-site-verification=ThY8KbXDavKHINOcM21wA0B323pSUlHZ");
+});
+
 // Endpoint to capture and log incoming authorization parameters for debugging unauthorized_client errors
 app.all("/api/debug/tiktok-auth", (req, res) => {
   const client_key = req.query.client_key || req.body.client_key || "Not provided";

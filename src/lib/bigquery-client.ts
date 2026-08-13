@@ -1,4 +1,9 @@
 import { BigQuery } from "@google-cloud/bigquery";
+import {
+  saveChatLogToFirestore,
+  savePsycheStateToFirestore,
+  saveAutonomousDecisionToFirestore,
+} from "./firebase";
 
 export interface ChatLogRecord {
   id: string;
@@ -215,6 +220,12 @@ class BigQueryClient {
       }
     }
 
+    // Persist to Firestore
+    saveChatLogToFirestore({
+      username: record.user_id || "Anónimo",
+      message: record.message,
+    }).catch((err) => console.warn("[Firestore] Chat log persist notice:", err?.message));
+
     return fullRecord;
   }
 
@@ -238,6 +249,14 @@ class BigQueryClient {
         console.warn("[BigQuery] Asynchronous psyche insert skipped:", err?.message);
       }
     }
+
+    savePsycheStateToFirestore({
+      machiavellianism: record.machiavellianism,
+      stoicism: record.stoicism,
+      creativeDrive: record.creative_drive,
+      empathy: 8.0,
+      currentEmotion: record.dominant_trait,
+    }).catch((err) => console.warn("[Firestore] Psyche state persist notice:", err?.message));
 
     return fullRecord;
   }
@@ -264,6 +283,12 @@ class BigQueryClient {
         console.warn("[BigQuery] Asynchronous decision insert skipped:", err?.message);
       }
     }
+
+    saveAutonomousDecisionToFirestore({
+      decisionType: record.decision_type,
+      speechText: record.decision_value,
+      confidence: record.confidence,
+    }).catch((err) => console.warn("[Firestore] Decision persist notice:", err?.message));
 
     return fullRecord;
   }
