@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import {
   getFirestore,
@@ -11,12 +11,22 @@ import {
   query,
   orderBy,
   limit,
-  getDocFromServer
+  getDocFromServer,
+  enableIndexedDbPersistence,
+  terminate
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Singleton initialization pattern
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+
+// Use default database if firestoreDatabaseId is missing or default
+const db = getFirestore(app, firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== "(default)" 
+  ? firebaseConfig.firestoreDatabaseId 
+  : undefined
+);
+
+export { db };
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
@@ -67,14 +77,19 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Connection test on boot
+// Connection test on boot with detailed error handling
 export async function testFirestoreConnection() {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    // Attempt to fetch a non-existent doc to verify connectivity
+    await getDocFromServer(doc(db, '_internal_', 'ping'));
     console.log('[Firebase] Connection to Firestore verified.');
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error('[Firebase] Client is offline. Please check your Firebase configuration.');
+  } catch (error: any) {
+    if (error?.message?.includes('offline') || error?.code === 'unavailable') {
+      console.warn('[Firebase] Firestore is currently unreachable (Client is offline or service unavailable).');
+    } else if (error?.code === 'permission-denied') {
+      console.warn('[Firebase] Connected, but permission denied for ping doc (this is normal if rules are restrictive).');
+    } else {
+      console.error('[Firebase] Firestore Connection Error:', error);
     }
   }
 }

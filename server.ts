@@ -228,6 +228,26 @@ app.get("/tiktoktnauWvNcdAEhW0CTm3RtYvMjfCppNjfz*", (req, res) => {
   res.send("tiktoktnauWvNcdAEhW0CTm3RtYvMjfCppNjfz");
 });
 
+app.get("/tiktokil5ZAosOEklehdHHP9lwO2rxTPQ1qwod.txt", (req, res) => {
+  res.type("text/plain");
+  res.send("tiktok-developers-site-verification=il5ZAosOEklehdHHP9lwO2rxTPQ1qwod");
+});
+
+app.get("/tiktok-developers-site-verification=il5ZAosOEklehdHHP9lwO2rxTPQ1qwod*", (req, res) => {
+  res.type("text/plain");
+  res.send("tiktok-developers-site-verification=il5ZAosOEklehdHHP9lwO2rxTPQ1qwod");
+});
+
+app.get("/tiktok-developers-site-verification=58o0bO0w67EDeqScw66ZzU4OoMCxGZel*", (req, res) => {
+  res.type("text/plain");
+  res.send("tiktok-developers-site-verification=58o0bO0w67EDeqScw66ZzU4OoMCxGZel");
+});
+
+app.get("/58o0bO0w67EDeqScw66ZzU4OoMCxGZel*", (req, res) => {
+  res.type("text/plain");
+  res.send("tiktok-developers-site-verification=58o0bO0w67EDeqScw66ZzU4OoMCxGZel");
+});
+
 app.get("/tiktokXn4xkCxcrGXQ1Xnq0kD0w9ZnmUbHy6mw*", (req, res) => {
   res.type("text/plain");
   res.send("tiktokXn4xkCxcrGXQ1Xnq0kD0w9ZnmUbHy6mw");
@@ -1013,12 +1033,13 @@ app.get("/api/tiktok/inspect", (req, res) => {
 // TikTok Domain Site Verification endpoints
 app.get("/tiktok-developers-site-verification=*", (_req, res) => {
   res.setHeader("Content-Type", "text/plain");
-  res.send("tiktok-developers-site-verification=ThY8KbXDavKHINOcM21wA0B323pSUlHZ");
+  // Defaulting to the new verification token as fallback
+  res.send("tiktok-developers-site-verification=58o0bO0w67EDeqScw66ZzU4OoMCxGZel");
 });
 
 app.get("/.well-known/tiktok-developers-site-verification.txt", (_req, res) => {
   res.setHeader("Content-Type", "text/plain");
-  res.send("tiktok-developers-site-verification=ThY8KbXDavKHINOcM21wA0B323pSUlHZ");
+  res.send("tiktok-developers-site-verification=58o0bO0w67EDeqScw66ZzU4OoMCxGZel");
 });
 
 // Endpoint to capture and log incoming authorization parameters for debugging unauthorized_client errors
@@ -1167,14 +1188,21 @@ app.post("/api/tiktok/init", async (req, res) => {
         addServerLog("INFO", "TIKTOK", "Official TikTok access token obtained inside /api/tiktok/init", { openId });
       } else {
         const isGrantError = responseData?.error === "invalid_grant" || responseData?.error === "invalid_request";
-        addServerLog(
-          "INFO",
-          "TIKTOK",
-          isGrantError
-            ? "TikTok authorization code already redeemed or expired. Session active."
-            : `TikTok token exchange note: ${responseData?.error || "unrecognized"}. Operating in connected stream mode.`,
-          responseData
-        );
+        if (isGrantError) {
+          addServerLog(
+            "INFO",
+            "TIKTOK",
+            "TikTok authorization code already redeemed or expired. Session active.",
+            { status: "code_redeemed_or_expired", sessionActive: true }
+          );
+        } else {
+          addServerLog(
+            "INFO",
+            "TIKTOK",
+            `TikTok token exchange note: ${responseData?.error || "unrecognized"}. Operating in connected stream mode.`,
+            { status: responseData?.error || "unrecognized" }
+          );
+        }
       }
     } catch (fetchErr: any) {
       addServerLog("ERROR", "TIKTOK", "Network error during TikTok token exchange in /api/tiktok/init", { error: fetchErr?.message });
@@ -1210,6 +1238,16 @@ app.post("/api/tiktok/exchange-token", async (req, res) => {
   }
 
   addServerLog("INFO", "TIKTOK", `Token exchange request received (Attempt #${attempt || 1})`, { code, simulateError });
+
+  // Pre-validation: Check if the user is mistakenly sending a DNS verification code
+  if (code && code.includes("tiktok-developers-site-verification")) {
+    addServerLog("WARN", "TIKTOK", "User attempted token exchange using a DNS verification code.", { code });
+    return res.status(400).json({
+      success: false,
+      error: "invalid_code_type",
+      message: "Has ingresado un código de verificación DNS. Para intercambiar tokens, necesitas un 'Authorization Code' obtenido mediante el flujo de OAuth de TikTok."
+    });
+  }
 
   if (simulateError) {
     addServerLog("WARN", "TIKTOK", `[Simulated 429 Rate Limit] TikTok API busy on attempt #${attempt}`);
@@ -1347,14 +1385,21 @@ app.get("/api/tiktok/callback", async (req, res) => {
         addServerLog("INFO", "TIKTOK", "Official TikTok access token obtained successfully", { openId });
       } else {
         const isGrantError = responseData?.error === "invalid_grant" || responseData?.error === "invalid_request";
-        addServerLog(
-          "INFO",
-          "TIKTOK",
-          isGrantError
-            ? "TikTok authorization code already redeemed or expired. Session connected and ready."
-            : `TikTok API token exchange note: ${responseData?.error || "unrecognized"}. Operating in connected stream mode.`,
-          responseData
-        );
+        if (isGrantError) {
+          addServerLog(
+            "INFO",
+            "TIKTOK",
+            "TikTok authorization code already redeemed or expired. Session connected and ready.",
+            { status: "code_redeemed_or_expired", sessionActive: true }
+          );
+        } else {
+          addServerLog(
+            "INFO",
+            "TIKTOK",
+            `TikTok API token exchange note: ${responseData?.error || "unrecognized"}. Operating in connected stream mode.`,
+            { status: responseData?.error || "unrecognized" }
+          );
+        }
       }
     } catch (fetchErr: any) {
       addServerLog("ERROR", "TIKTOK", "Network error during TikTok token exchange", { error: fetchErr?.message });

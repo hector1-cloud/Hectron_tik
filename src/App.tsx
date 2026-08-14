@@ -13,6 +13,7 @@ import { TiktokDnsGuide } from "./components/TiktokDnsGuide";
 import { TiktokTokenExchange } from "./components/TiktokTokenExchange";
 import { WorkersAiRunner } from "./components/WorkersAiRunner";
 import { CloudflareWorkflowsRunner } from "./components/CloudflareWorkflowsRunner";
+import ExecutiveGuide from "./components/ExecutiveGuide";
 import { jsPDF } from "jspdf";
 import {
   Mic,
@@ -37,6 +38,7 @@ import {
   Image,
   AlertTriangle,
   CheckCircle2,
+  Target,
 } from "lucide-react";
 
 const downloadImageAsPDF = async (imageSrc: string, pdfFileName: string) => {
@@ -537,26 +539,42 @@ export default function App() {
       const res = await fetchWithBackoff("/api/tiktok/inspect");
       if (res.ok) {
         const payload = await res.json();
-        const configuredRedirect = payload.data.redirectUri;
+        const configuredRedirect = payload?.data?.redirectUri;
+        
+        if (!configuredRedirect) {
+          throw new Error("El servidor no devolvió una URL de redirección válida.");
+        }
         
         // Comparación dinámica de la URL actual de la aplicación (window.location.href) con REDIRECT_URI
         const currentUrl = window.location.href;
         const currentOrigin = new URL(currentUrl).origin;
         
-        const parsedRedirect = new URL(configuredRedirect);
-        const redirectOrigin = parsedRedirect.origin;
-        const hostMatches = redirectOrigin === currentOrigin;
+        try {
+          const parsedRedirect = new URL(configuredRedirect);
+          const redirectOrigin = parsedRedirect.origin;
+          const hostMatches = redirectOrigin === currentOrigin;
 
-        setDiagnosticResult({
-          redirectUri: configuredRedirect,
-          hostMatches,
-          currentHost: currentOrigin,
-          configuredRedirect,
-          suggestedRedirect: `${currentOrigin}/api/tiktok/callback`
-        });
+          setDiagnosticResult({
+            redirectUri: configuredRedirect,
+            hostMatches,
+            currentHost: currentOrigin,
+            configuredRedirect,
+            suggestedRedirect: `${currentOrigin}/api/tiktok/callback`
+          });
+        } catch (urlErr) {
+          console.error("URL de redirección configurada no es válida:", configuredRedirect);
+          setDiagnosticResult({
+            redirectUri: configuredRedirect,
+            hostMatches: false,
+            currentHost: currentOrigin,
+            configuredRedirect,
+            suggestedRedirect: `${currentOrigin}/api/tiktok/callback`
+          });
+        }
       }
-    } catch (err) {
-      console.error("Failed to run diagnostics after backoff retries:", err);
+    } catch (err: any) {
+      console.error("Error detallado en diagnósticos de TikTok:", err);
+      // No lanzamos error para no romper la app, el estado isDiagnosing se maneja en finally
     } finally {
       setIsDiagnosing(false);
     }
@@ -731,6 +749,18 @@ export default function App() {
               <GitFork className="w-4 h-4" />
               <span>Workflows</span>
             </button>
+
+            <button
+              onClick={() => setActiveTab("executive")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                activeTab === "executive"
+                  ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Target className="w-4 h-4" />
+              <span>Estrategia</span>
+            </button>
           </nav>
 
           {/* Status Badges */}
@@ -767,7 +797,7 @@ export default function App() {
                 <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                   <div className="flex items-center gap-2">
                     <Bot className="w-4 h-4 text-cyan-400" />
-                    <span className="text-sm font-bold text-white">Miku 3D Avatar</span>
+                    <span className="text-sm font-bold text-white uppercase tracking-wider">Abadalabs Core Engine</span>
                   </div>
 
                   <div className="flex items-center gap-1.5">
@@ -1434,6 +1464,11 @@ export default function App() {
 
         {activeTab === "workers-ai" && <WorkersAiRunner />}
         {activeTab === "workflows" && <CloudflareWorkflowsRunner />}
+        {activeTab === "executive" && (
+          <div className="fixed inset-0 top-[65px] z-30">
+            <ExecutiveGuide />
+          </div>
+        )}
       </main>
 
       {/* Footer */}

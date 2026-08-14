@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   KeyRound,
   RefreshCw,
@@ -27,10 +27,13 @@ interface AttemptLog {
 }
 
 export function TiktokTokenExchange() {
-  const [authCode, setAuthCode] = useState<string>("code_demo_tiktok_2026_xyz89");
+  const [authCode, setAuthCode] = useState<string>("code_demo_tiktok_default_2026");
   const [maxRetries, setMaxRetries] = useState<number>(4);
   const [baseDelayMs, setBaseDelayMs] = useState<number>(1500); // 1.5 seconds base
   const [simulateErrors, setSimulateErrors] = useState<boolean>(true);
+
+  // Verification code detection
+  const isVerificationCode = authCode.includes("tiktok-developers-site-verification");
 
   // Execution State
   const [isRunning, setIsRunning] = useState<boolean>(false);
@@ -46,6 +49,13 @@ export function TiktokTokenExchange() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const abortControllerRef = useRef<boolean>(false);
 
+  // Clean up on unmount to prevent memory leaks with setInterval/Promises
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current = true;
+    };
+  }, []);
+
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedKey(id);
@@ -60,9 +70,10 @@ export function TiktokTokenExchange() {
       setWaitProgress(0);
 
       const interval = setInterval(() => {
+        // Stop if aborted manually
         if (abortControllerRef.current) {
           clearInterval(interval);
-          resolve(false); // Aborted
+          resolve(false);
           return;
         }
 
@@ -80,6 +91,9 @@ export function TiktokTokenExchange() {
           resolve(true); // Completed delay
         }
       }, 40); // 25fps smooth progress bar updates
+      
+      // Cleanup interval on unmount will be hard here unless we store intervalId in a ref,
+      // but abortControllerRef usually handles cancellation if component cancels properly.
     });
   };
 
@@ -102,6 +116,16 @@ export function TiktokTokenExchange() {
     if (!authCode.trim()) return;
 
     abortControllerRef.current = false;
+    if (isVerificationCode) {
+      setLogs([{
+        attempt: 0,
+        timestamp: new Date().toLocaleTimeString(),
+        status: "failed",
+        error: "No se puede iniciar el intercambio: Se detectó un código de verificación DNS en lugar de un Authorization Code."
+      }]);
+      return;
+    }
+
     setIsRunning(true);
     setLogs([]);
     setCurrentAttempt(0);
@@ -276,7 +300,12 @@ export function TiktokTokenExchange() {
           ) : (
             <button
               onClick={runTokenExchangeWithExponentialBackoff}
-              className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-lg text-xs transition cursor-pointer flex items-center gap-2 shadow-lg shadow-cyan-500/20"
+              disabled={isVerificationCode}
+              className={`px-4 py-2 font-bold rounded-lg text-xs transition flex items-center gap-2 shadow-lg ${
+                isVerificationCode 
+                ? "bg-slate-800 text-slate-500 cursor-not-allowed" 
+                : "bg-cyan-500 hover:bg-cyan-400 text-slate-950 cursor-pointer shadow-cyan-500/20"
+              }`}
             >
               <Play className="w-3.5 h-3.5 fill-current" />
               <span>Ejecutar Intercambio con Reintentos</span>
@@ -301,8 +330,16 @@ export function TiktokTokenExchange() {
             onChange={(e) => setAuthCode(e.target.value.trim())}
             disabled={isRunning}
             placeholder="ej. code_tiktok_oauth_123"
-            className="w-full bg-slate-900 border border-slate-800 focus:border-cyan-400 rounded-lg px-3 py-2 text-xs text-white font-mono outline-none transition disabled:opacity-50"
+            className={`w-full bg-slate-900 border ${isVerificationCode ? 'border-amber-500/50 focus:border-amber-500' : 'border-slate-800 focus:border-cyan-400'} rounded-lg px-3 py-2 text-xs text-white font-mono outline-none transition disabled:opacity-50`}
           />
+          {isVerificationCode && (
+            <div className="flex items-start gap-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-md animate-pulse">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-[10px] text-amber-200 leading-tight">
+                <strong>Atención:</strong> Parece que has ingresado un código de verificación DNS. Para este paso, necesitas un <strong>Authorization Code</strong> obtenido tras el login de TikTok.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Backoff Parameters */}

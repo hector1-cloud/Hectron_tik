@@ -15,7 +15,7 @@ export function BrainProvider({ children }: { children: ReactNode }) {
   const [emotion, setEmotion] = useState<Emotion>("HAPPY");
   const [isAutonomous, setIsAutonomous] = useState<boolean>(true);
   const [tiktokConnected, setTiktokConnected] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "overlay" | "agent" | "tiktok" | "logs" | "performance" | "autonomy" | "workers-ai" | "workflows">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "overlay" | "agent" | "tiktok" | "logs" | "performance" | "autonomy" | "workers-ai" | "workflows" | "executive">("dashboard");
 
   // LOD & FPS state for 3D optimization
   const [lodLevel, setLodLevel] = useState<"HIGH" | "MEDIUM" | "LOW">("HIGH");
@@ -177,6 +177,7 @@ export function BrainProvider({ children }: { children: ReactNode }) {
         setTiktokConnected(true);
         return;
       }
+      localStorage.removeItem("hectron_tiktok_code"); // One-time code used, clear immediately
 
       addLog("INFO", "TIKTOK", "Verificando sesión activa de TikTok LIVE con el servidor...");
       try {
@@ -185,7 +186,6 @@ export function BrainProvider({ children }: { children: ReactNode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ code: savedCode }),
         });
-        localStorage.removeItem("hectron_tiktok_code"); // One-time code used
         if (res.ok) {
           setTiktokConnected(true);
           addLog("INFO", "TIKTOK", "¡Sesión de TikTok LIVE vinculada activamente!");
@@ -194,7 +194,6 @@ export function BrainProvider({ children }: { children: ReactNode }) {
           addLog("INFO", "TIKTOK", "Sesión de TikTok LIVE activa mantenida en el servidor.");
         }
       } catch (err: any) {
-        localStorage.removeItem("hectron_tiktok_code");
         setTiktokConnected(true);
         addLog("INFO", "TIKTOK", "Sesión de TikTok LIVE lista en modo activo.");
       }

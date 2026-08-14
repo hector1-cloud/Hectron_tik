@@ -66,8 +66,8 @@ export interface BrainContextType {
   setTiktokConnected: (val: boolean) => void;
   messages: ChatMessage[];
   addMessage: (msg: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
-  activeTab: 'dashboard' | 'overlay' | 'agent' | 'tiktok' | 'logs' | 'performance' | 'autonomy' | 'workers-ai' | 'workflows';
-  setActiveTab: (tab: 'dashboard' | 'overlay' | 'agent' | 'tiktok' | 'logs' | 'performance' | 'autonomy' | 'workers-ai' | 'workflows') => void;
+  activeTab: 'dashboard' | 'overlay' | 'agent' | 'tiktok' | 'logs' | 'performance' | 'autonomy' | 'workers-ai' | 'workflows' | 'executive';
+  setActiveTab: (tab: 'dashboard' | 'overlay' | 'agent' | 'tiktok' | 'logs' | 'performance' | 'autonomy' | 'workers-ai' | 'workflows' | 'executive') => void;
   speakText: (text: string, emotion?: Emotion) => Promise<void>;
   latestSpeechText: string;
   isSpeaking: boolean;

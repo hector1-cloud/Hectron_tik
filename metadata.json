@@ -1,6 +1,6 @@
 {
-  "name": "HECTRON Streamer Studio",
-  "description": "Streamer virtual autónomo con avatar 3D Miku, Gemini AI TTS, control de OBS y TikTok LIVE Chat",
+  "name": "HECTRON Live Universe",
+  "description": "Autonomous AI Streaming & Interactive Universe Engine by Abadalabs, Inc.",
   "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
