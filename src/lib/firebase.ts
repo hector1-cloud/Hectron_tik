@@ -156,3 +156,51 @@ export async function saveMetricToFirestore(metricName: string, value: number) {
     handleFirestoreError(err, OperationType.WRITE, path);
   }
 }
+
+// Game Save and Load Cloud Firestore Operations
+export async function saveGameToFirestore(slotId: string, payload: any) {
+  const path = `save_games`;
+  try {
+    const docRef = doc(db, path, slotId);
+    await setDoc(docRef, {
+      ...payload,
+      updatedAt: new Date().toISOString(),
+    });
+    console.log(`[Firebase] Game state saved to Cloud Firestore in slot: ${slotId}`);
+    return true;
+  } catch (err) {
+    console.warn(`[Firebase] Cloud save failed for slot ${slotId}, continuing with local cache.`, err);
+    return false;
+  }
+}
+
+export async function loadGameFromFirestore(slotId: string) {
+  const path = `save_games`;
+  try {
+    const docRef = doc(db, path, slotId);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return snap.data();
+    }
+    return null;
+  } catch (err) {
+    console.warn(`[Firebase] Cloud load failed for slot ${slotId}`, err);
+    return null;
+  }
+}
+
+export async function listSavedGamesFromFirestore() {
+  const path = `save_games`;
+  try {
+    const snap = await getDocs(collection(db, path));
+    const saves: any[] = [];
+    snap.forEach((d) => {
+      saves.push({ id: d.id, ...d.data() });
+    });
+    return saves;
+  } catch (err) {
+    console.warn(`[Firebase] Failed listing cloud saves:`, err);
+    return [];
+  }
+}
+

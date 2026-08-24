@@ -14,7 +14,8 @@ import {
   Check,
   RotateCcw,
   ShieldCheck,
-  Activity
+  Activity,
+  Globe
 } from "lucide-react";
 
 interface AttemptLog {
@@ -30,10 +31,56 @@ export function TiktokTokenExchange() {
   const [authCode, setAuthCode] = useState<string>("code_demo_tiktok_default_2026");
   const [maxRetries, setMaxRetries] = useState<number>(4);
   const [baseDelayMs, setBaseDelayMs] = useState<number>(1500); // 1.5 seconds base
-  const [simulateErrors, setSimulateErrors] = useState<boolean>(true);
+  const [simulateErrors, setSimulateErrors] = useState<boolean>(false);
+
+  // Revoke state
+  const [tokenToRevoke, setTokenToRevoke] = useState<string>("");
+  const [isRevoking, setIsRevoking] = useState<boolean>(false);
+  const [revokeResult, setRevokeResult] = useState<{ success: boolean; message: string; details?: any } | null>(null);
+
+  const EULERSTREAM_OAUTH = {
+    authorize: "https://www.eulerstream.com/tiktok/oauth/authorize",
+    token: "https://tiktok.eulerstream.com/tiktok/oauth/token",
+    revoke: "https://tiktok.eulerstream.com/tiktok/oauth/revoke"
+  };
+
+  const handleRevokeToken = async () => {
+    setIsRevoking(true);
+    setRevokeResult(null);
+    try {
+      const res = await fetch("/api/tiktok/revoke-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: tokenToRevoke })
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setRevokeResult({
+          success: true,
+          message: data.message || "Token revocado exitosamente a través de EulerStream OAuth.",
+          details: data.data
+        });
+      } else {
+        setRevokeResult({
+          success: false,
+          message: data.error || "No se pudo revocar el token.",
+          details: data
+        });
+      }
+    } catch (err: any) {
+      setRevokeResult({
+        success: false,
+        message: `Error al conectar con la API de revocación: ${err?.message || "Error de red"}`
+      });
+    } finally {
+      setIsRevoking(false);
+    }
+  };
 
   // Verification code detection
-  const isVerificationCode = authCode.includes("tiktok-developers-site-verification");
+  const isVerificationCode = authCode.includes("tiktok-developers-site-verification") || 
+                             authCode === "il5ZAosOEklehdHHP9lwO2rxTPQ1qwod" ||
+                             authCode === "58o0bO0w67EDeqScw66ZzU4OoMCxGZel";
 
   // Execution State
   const [isRunning, setIsRunning] = useState<boolean>(false);
@@ -509,6 +556,218 @@ export function TiktokTokenExchange() {
           </div>
         </div>
       )}
+
+      {/* EulerStream OAuth Endpoints Card */}
+      <div className="bg-slate-950 p-4 rounded-xl border border-cyan-500/30 space-y-4 shadow-lg relative overflow-hidden">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-cyan-400" />
+            <div>
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <span>Puntos Finales de OAuth EulerStream (TikTok Developers)</span>
+                <span className="text-[10px] bg-emerald-950 text-emerald-400 font-mono px-2 py-0.5 rounded border border-emerald-500/30">
+                  Integrados
+                </span>
+              </h4>
+              <p className="text-[11px] text-slate-400">Endpoints configurados para autorización, intercambio de tokens y revocación.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3 text-xs">
+          {/* 1. Authorize Endpoint */}
+          <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-300 font-bold flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                <span>1. Iniciar Flujo de Autorización (Authorize URL)</span>
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleCopy(EULERSTREAM_OAUTH.authorize, "endpoint_auth")}
+                  className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-bold cursor-pointer transition flex items-center gap-1"
+                >
+                  {copiedKey === "endpoint_auth" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  <span>Copiar</span>
+                </button>
+                <a
+                  href="/api/tiktok/login"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-2.5 py-1 bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/30 rounded text-[10px] font-bold cursor-pointer transition flex items-center gap-1"
+                >
+                  <span>Iniciar Login</span>
+                </a>
+              </div>
+            </div>
+            <div className="bg-slate-950 p-2 rounded font-mono text-[11px] text-cyan-300 border border-slate-800/80 break-all select-all">
+              {EULERSTREAM_OAUTH.authorize}
+            </div>
+          </div>
+
+          {/* 2. Token Exchange Endpoint */}
+          <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-300 font-bold flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span>2. Intercambio de Códigos por Tokens de Acceso (Token URL)</span>
+              </span>
+              <button
+                onClick={() => handleCopy(EULERSTREAM_OAUTH.token, "endpoint_token")}
+                className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-bold cursor-pointer transition flex items-center gap-1"
+              >
+                {copiedKey === "endpoint_token" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>Copiar</span>
+              </button>
+            </div>
+            <div className="bg-slate-950 p-2 rounded font-mono text-[11px] text-emerald-300 border border-slate-800/80 break-all select-all">
+              {EULERSTREAM_OAUTH.token}
+            </div>
+          </div>
+
+          {/* 3. Revoke / Refresh Endpoint */}
+          <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-300 font-bold flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                <span>3. Revocar Acceso o Refrescar Tokens (Revoke URL)</span>
+              </span>
+              <button
+                onClick={() => handleCopy(EULERSTREAM_OAUTH.revoke, "endpoint_revoke")}
+                className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-bold cursor-pointer transition flex items-center gap-1"
+              >
+                {copiedKey === "endpoint_revoke" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>Copiar</span>
+              </button>
+            </div>
+            <div className="bg-slate-950 p-2 rounded font-mono text-[11px] text-amber-300 border border-slate-800/80 break-all select-all">
+              {EULERSTREAM_OAUTH.revoke}
+            </div>
+
+            {/* Interactive Revoke Token Input */}
+            <div className="pt-2 border-t border-slate-800 space-y-2">
+              <span className="text-[11px] text-slate-400 font-semibold block">Probar Revocación de Token:</span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={tokenToRevoke}
+                  onChange={(e) => setTokenToRevoke(e.target.value.trim())}
+                  placeholder="Introduce access_token o refresh_token para revocar"
+                  className="flex-1 bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-white font-mono outline-none focus:border-amber-400"
+                />
+                <button
+                  onClick={handleRevokeToken}
+                  disabled={isRevoking}
+                  className="px-3 py-1.5 bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-500/30 rounded text-xs font-bold transition cursor-pointer flex items-center gap-1 shrink-0"
+                >
+                  <RotateCcw className={`w-3.5 h-3.5 ${isRevoking ? "animate-spin" : ""}`} />
+                  <span>{isRevoking ? "Revocando..." : "Revocar Token"}</span>
+                </button>
+              </div>
+
+              {revokeResult && (
+                <div
+                  className={`p-2.5 rounded border text-xs ${
+                    revokeResult.success
+                      ? "bg-emerald-950/50 border-emerald-500/30 text-emerald-300"
+                      : "bg-red-950/50 border-red-500/30 text-red-300"
+                  }`}
+                >
+                  <p className="font-bold">{revokeResult.message}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* EulerStream CDN & Webhook Credentials Card */}
+      <div className="bg-slate-950 p-4 rounded-xl border border-purple-500/30 space-y-4 shadow-lg">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <Globe className="w-5 h-5 text-purple-400" />
+            <div>
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <span>Configuración CDN EulerStream y Webhooks de Alertas</span>
+                <span className="text-[10px] bg-purple-950 text-purple-300 font-mono px-2 py-0.5 rounded border border-purple-500/30">
+                  CORS Activo
+                </span>
+              </h4>
+              <p className="text-[11px] text-slate-400">Parámetros de conexión, origen permitido y secretos para webhooks de alertas.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          {/* CDN Host */}
+          <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 font-medium">Nombre de Host CDN:</span>
+              <button
+                onClick={() => handleCopy("7bfqra32uhm6g0zl.assets.cdn.eulerstream.com", "cdn_host")}
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-bold cursor-pointer transition flex items-center gap-1"
+              >
+                {copiedKey === "cdn_host" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>Copiar</span>
+              </button>
+            </div>
+            <div className="font-mono text-white text-[11px] bg-slate-950 p-2 rounded border border-slate-800 break-all select-all">
+              7bfqra32uhm6g0zl.assets.cdn.eulerstream.com
+            </div>
+          </div>
+
+          {/* Generated CORS Origin */}
+          <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 font-medium">Origen de CORS Generado:</span>
+              <button
+                onClick={() => handleCopy("https://7bfqra32uhm6g0zl.assets.cdn.eulerstream.com", "cors_origin")}
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-bold cursor-pointer transition flex items-center gap-1"
+              >
+                {copiedKey === "cors_origin" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>Copiar</span>
+              </button>
+            </div>
+            <div className="font-mono text-purple-300 text-[11px] bg-slate-950 p-2 rounded border border-purple-900/50 break-all select-all">
+              https://7bfqra32uhm6g0zl.assets.cdn.eulerstream.com
+            </div>
+          </div>
+
+          {/* API Key EulerStream */}
+          <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 font-medium">API Key EulerStream:</span>
+              <button
+                onClick={() => handleCopy("euler_OTVjZTVkZTkwZjhlY2FhZjJmODEzYzY5ZGFiMTBjZTQxNzUyNzBjZjliMWFmZmQ5Njc5MzRm", "euler_api_key")}
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-bold cursor-pointer transition flex items-center gap-1"
+              >
+                {copiedKey === "euler_api_key" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>Copiar</span>
+              </button>
+            </div>
+            <div className="font-mono text-emerald-300 text-[11px] bg-slate-950 p-2 rounded border border-slate-800 break-all select-all">
+              euler_OTVjZTVkZTkwZjhlY2FhZjJmODEzYzY5ZGFiMTBjZTQxNzUyNzBjZjliMWFmZmQ5Njc5MzRm
+            </div>
+          </div>
+
+          {/* Webhook Secret */}
+          <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 font-medium">Secreto Webhook Alertas:</span>
+              <button
+                onClick={() => handleCopy("19f761b2d5a310038df9b7102f0c70b192694459d06c19c9e5582835fd663e30", "webhook_secret")}
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-bold cursor-pointer transition flex items-center gap-1"
+              >
+                {copiedKey === "webhook_secret" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>Copiar</span>
+              </button>
+            </div>
+            <div className="font-mono text-amber-300 text-[11px] bg-slate-950 p-2 rounded border border-slate-800 break-all select-all">
+              19f761b2d5a310038df9b7102f0c70b192694459d06c19c9e5582835fd663e30
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Explanatory Formula Card */}
       <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs text-slate-300">

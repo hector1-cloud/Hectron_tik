@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.abadalabs.sims.enterprise">
+
+    <!-- Permissions for Network, Streaming & Multimedia APIs -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Queries declaration for TikTok OpenSDK & Companion App detection -->
+    <queries>
+        <package android:name="com.zhiliaoapp.musically" />
+        <package android:name="com.ss.android.ugc.trill" />
+        <package android:name="com.ss.android.ugc.aweme" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="true"
+        android:icon="@android:drawable/sym_def_app_icon"
+        android:label="Sims Enterprise"
+        android:roundIcon="@android:drawable/sym_def_app_icon"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
+        android:theme="@android:style/Theme.Material.NoActionBar">
+
+        <!-- TikTok OpenSDK App Configuration Metadata -->
+        <meta-data
+            android:name="com.tiktok.sdk.ClientKey"
+            android:value="awvckv5za3nclqpe" />
+
+        <activity
+            android:name="com.abadalabs.sims.enterprise.MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:theme="@android:style/Theme.Material.NoActionBar">
+            
+            <!-- Default Launcher Intent Filter -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Deep Link Intent Filter for TikTok OAuth / App Callbacks -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="sims-enterprise"
+                    android:host="tiktok-auth" />
+            </intent-filter>
+
+            <!-- Web App OAuth Redirect Scheme -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="hectron.abadalabs.com"
+                    android:pathPrefix="/api/tiktok/callback" />
+            </intent-filter>
+        </activity>
+
+    </application>
+
+</manifest>

@@ -1,5 +1,7 @@
 import { createContext, useState, useEffect, ReactNode, useRef } from "react";
-import { BrainContextType, Emotion, ObsStatus, ChatMessage, LogEntry, LogLevel, LogScope } from "./types";
+import { BrainContextType, Emotion, AvatarAnimationClass, ObsStatus, ChatMessage, LogEntry, LogLevel, LogScope } from "./types";
+import { useGeminiTtsEmotion } from "./hooks/useGeminiTtsEmotion";
+import { useGameState } from "./hooks/useGameState";
 
 export const BrainContext = createContext<BrainContextType>({} as BrainContextType);
 
@@ -12,10 +14,18 @@ export function BrainProvider({ children }: { children: ReactNode }) {
     scene: "DEFAULT",
   });
   const [scenes, setScenes] = useState<string[]>([]);
-  const [emotion, setEmotion] = useState<Emotion>("HAPPY");
+  const {
+    animationClass,
+    setAnimationClass,
+    emotion,
+    setEmotion,
+    latestMetadata: latestTtsMetadata,
+    processTtsMetadata,
+  } = useGeminiTtsEmotion();
+
   const [isAutonomous, setIsAutonomous] = useState<boolean>(true);
   const [tiktokConnected, setTiktokConnected] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "overlay" | "agent" | "tiktok" | "logs" | "performance" | "autonomy" | "workers-ai" | "workflows" | "executive">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "game" | "inventory" | "saves" | "overlay" | "agent" | "tiktok" | "duix" | "streamerbot" | "logs" | "performance" | "autonomy" | "workers-ai" | "workflows" | "executive" | "enterprise" | "sims">("dashboard");
 
   // LOD & FPS state for 3D optimization
   const [lodLevel, setLodLevel] = useState<"HIGH" | "MEDIUM" | "LOW">("HIGH");
@@ -28,7 +38,7 @@ export function BrainProvider({ children }: { children: ReactNode }) {
       timestamp: new Date().toISOString(),
       level: "INFO",
       scope: "FRONTEND",
-      message: "Client application mounted & BrainContext initialized",
+      message: "Sistema HECTRON Universe montado & BrainContext listo.",
     },
   ]);
 
@@ -55,6 +65,29 @@ export function BrainProvider({ children }: { children: ReactNode }) {
     setLogs([]);
     fetch("/api/logs", { method: "DELETE" }).catch(() => {});
   };
+
+  // Connect Game, Inventory and Save/Load hook
+  const {
+    gameState,
+    collectItem,
+    useItem,
+    equipItem,
+    discardItem,
+    spawnRandomWorldItem,
+    pickupWorldItem,
+    saveGame,
+    loadGame,
+    deleteSave,
+    exportSaveData,
+    importSaveData,
+    saveSlots,
+    isAutoSaving,
+    lastAutoSaveTime,
+    triggerAutoSave,
+    gainExperience,
+    gainCoins,
+    soundEffect,
+  } = useGameState(obsStatus.scene, emotion, setEmotion, addLog);
 
   // Poll server logs periodically
   useEffect(() => {
@@ -296,6 +329,17 @@ export function BrainProvider({ children }: { children: ReactNode }) {
                 voiceResponse = `Oh ${data.user}, no estés triste. Muchas gracias por tu tierno apoyo.`;
               }
 
+              // Reward player with in-game items & coins on TikTok Gift!
+              if (normalized.includes("rosa") || normalized.includes("rose")) {
+                collectItem("cyber_rose", data.count || 1);
+              } else if (normalized.includes("corona") || normalized.includes("crown")) {
+                collectItem("streamer_crown", 1);
+                gainCoins(500);
+              } else {
+                gainCoins((data.count || 1) * 20);
+                gainExperience((data.count || 1) * 15);
+              }
+
               setEmotion(targetEmotion);
               setObsStatus((prev) => ({ ...prev, scene: targetScene }));
               speakText(voiceResponse, targetEmotion).catch(err => console.warn("TTS error:", err));
@@ -306,6 +350,8 @@ export function BrainProvider({ children }: { children: ReactNode }) {
                 isAi: false,
               });
               addLog("INFO", "TIKTOK", `Nuevo seguidor en directo: ${data.user}`);
+              gainCoins(50);
+              gainExperience(25);
             } else if (data.type === "log" && data.entry) {
               const entry = data.entry;
               if (entry.scope !== "FRONTEND") {
@@ -371,10 +417,21 @@ export function BrainProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Audio / Speech Synthesizer Function
-  const speakText = async (text: string, currentEmotion?: Emotion) => {
+  const speakText = async (text: string, currentEmotion?: Emotion, customAnimation?: AvatarAnimationClass) => {
     setIsSpeaking(true);
     setLatestSpeechText(text);
-    addLog("INFO", "FRONTEND", `Triggering speech synthesis: "${text.substring(0, 30)}..."`);
+
+    // Map Gemini TTS text/metadata to avatar emotion state & animation class
+    const ttsMeta = processTtsMetadata(text, { emotion: currentEmotion });
+    if (customAnimation) {
+      setAnimationClass(customAnimation);
+    }
+    
+    addLog("INFO", "FRONTEND", `Triggering Gemini TTS synthesis [${ttsMeta.animationClass.toUpperCase()}]: "${text.substring(0, 30)}..."`, {
+      sentimentScore: ttsMeta.sentimentScore,
+      emotion: ttsMeta.emotion,
+      animationClass: ttsMeta.animationClass,
+    });
 
     try {
       const res = await fetch("/api/tts", {
@@ -446,8 +503,8 @@ export function BrainProvider({ children }: { children: ReactNode }) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = "es-ES";
-      utterance.pitch = 1.35; // High pitch for cute anime Miku voice
-      utterance.rate = 1.05;
+      utterance.pitch = ttsMeta.pitch || 1.35; // Dynamic pitch based on sentiment
+      utterance.rate = ttsMeta.speed || 1.05;
       utterance.onend = () => setIsSpeaking(false);
       utterance.onerror = () => setIsSpeaking(false);
       window.speechSynthesis.speak(utterance);
@@ -469,6 +526,9 @@ export function BrainProvider({ children }: { children: ReactNode }) {
         setScenes,
         emotion,
         setEmotion,
+        animationClass,
+        setAnimationClass,
+        latestTtsMetadata,
         isAutonomous,
         setIsAutonomous,
         tiktokConnected,
@@ -486,6 +546,25 @@ export function BrainProvider({ children }: { children: ReactNode }) {
         lodLevel,
         setLodLevel,
         fps,
+        gameState,
+        collectItem,
+        useItem,
+        equipItem,
+        discardItem,
+        spawnRandomWorldItem,
+        pickupWorldItem,
+        saveGame,
+        loadGame,
+        deleteSave,
+        exportSaveData,
+        importSaveData,
+        saveSlots,
+        isAutoSaving,
+        lastAutoSaveTime,
+        triggerAutoSave,
+        gainExperience,
+        gainCoins,
+        soundEffect,
       }}
     >
       {children}

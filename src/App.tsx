@@ -11,9 +11,19 @@ import { AutonomyMetricsView } from "./components/AutonomyMetricsView";
 import { AndroidFirebaseValidator } from "./components/AndroidFirebaseValidator";
 import { TiktokDnsGuide } from "./components/TiktokDnsGuide";
 import { TiktokTokenExchange } from "./components/TiktokTokenExchange";
+import { TiktokLiveConnectorCard } from "./components/TiktokLiveConnectorCard";
 import { WorkersAiRunner } from "./components/WorkersAiRunner";
 import { CloudflareWorkflowsRunner } from "./components/CloudflareWorkflowsRunner";
+import { EnterpriseCoreDashboard } from "./components/EnterpriseCoreDashboard";
+import { SimsEnterpriseStudio } from "./components/SimsEnterpriseStudio";
+import { DuixAvatarStudio } from "./components/DuixAvatarStudio";
+import { StreamerBotStudio } from "./components/StreamerBotStudio";
+import { TiktokActivityHeatmap } from "./components/TiktokActivityHeatmap";
 import ExecutiveGuide from "./components/ExecutiveGuide";
+import { InventoryMenu } from "./components/InventoryMenu";
+import { SaveLoadManager } from "./components/SaveLoadManager";
+import { GameWorldView } from "./components/GameWorldView";
+import { StartupHealthCheck } from "./components/StartupHealthCheck";
 import { jsPDF } from "jspdf";
 import {
   Mic,
@@ -28,6 +38,7 @@ import {
   Bot,
   Volume2,
   Cpu,
+  Cable,
   HelpCircle,
   Terminal,
   Activity,
@@ -39,6 +50,13 @@ import {
   AlertTriangle,
   CheckCircle2,
   Target,
+  Layers,
+  Users,
+  Gamepad2,
+  Package,
+  Save,
+  Coins,
+  Shield,
 } from "lucide-react";
 
 const downloadImageAsPDF = async (imageSrc: string, pdfFileName: string) => {
@@ -91,7 +109,7 @@ const downloadImageAsPDF = async (imageSrc: string, pdfFileName: string) => {
 
 export default function App() {
   const [previewType, setPreviewType] = useState<"interactive" | "sketchfab">("interactive");
-  const [tiktokSubTab, setTiktokSubTab] = useState<"web" | "dns" | "android" | "mockups">("web");
+  const [tiktokSubTab, setTiktokSubTab] = useState<"live" | "web" | "dns" | "android" | "mockups">("live");
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [isDownloading1, setIsDownloading1] = useState(false);
   const [isDownloading2, setIsDownloading2] = useState(false);
@@ -490,8 +508,13 @@ export default function App() {
     agentUrl,
     setAgentUrl,
     emotion,
+    animationClass,
+    latestTtsMetadata,
     latestSpeechText,
     isSpeaking,
+    gameState,
+    isAutoSaving,
+    lastAutoSaveTime,
   } = useContext(BrainContext);
 
   const [tiktokError, setTiktokError] = useState<string | null>(null);
@@ -643,6 +666,42 @@ export default function App() {
           {/* Navigation Tabs */}
           <nav className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
             <button
+              onClick={() => setActiveTab("game")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                activeTab === "game"
+                  ? "bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-md shadow-purple-500/20"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Gamepad2 className="w-4 h-4" />
+              <span>Juego 3D</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("inventory")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                activeTab === "inventory"
+                  ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Package className="w-4 h-4" />
+              <span>Inventario</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("saves")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                activeTab === "saves"
+                  ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Save className="w-4 h-4" />
+              <span>Guardar/Cargar</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab("dashboard")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 activeTab === "dashboard"
@@ -727,6 +786,30 @@ export default function App() {
             </button>
 
             <button
+              onClick={() => setActiveTab("duix")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                activeTab === "duix"
+                  ? "bg-indigo-500 text-white shadow-md shadow-indigo-500/20"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Bot className="w-4 h-4" />
+              <span>Duix Avatar (v2)</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("streamerbot")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                activeTab === "streamerbot"
+                  ? "bg-purple-500 text-slate-950 shadow-md shadow-purple-500/20"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Cable className="w-4 h-4" />
+              <span>Streamer.bot</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab("workers-ai")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 activeTab === "workers-ai"
@@ -751,6 +834,30 @@ export default function App() {
             </button>
 
             <button
+              onClick={() => setActiveTab("enterprise")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                activeTab === "enterprise"
+                  ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Layers className="w-4 h-4" />
+              <span>Enterprise 2.0</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("sims")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                activeTab === "sims"
+                  ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Sims AI (Android)</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab("executive")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 activeTab === "executive"
@@ -765,6 +872,24 @@ export default function App() {
 
           {/* Status Badges */}
           <div className="flex items-center gap-2">
+            {/* CyberCoins Chip */}
+            <button
+              onClick={() => setActiveTab("inventory")}
+              className="flex items-center gap-1.5 bg-slate-950 px-3 py-1 rounded-full text-xs font-bold text-amber-300 border border-amber-500/40 hover:border-amber-400 transition cursor-pointer"
+              title="Abrir Inventario"
+            >
+              <Coins className="w-3.5 h-3.5 text-amber-400" />
+              <span>{gameState?.player?.cyberCoins || 0} ₢</span>
+            </button>
+
+            {/* AutoSave Indicator */}
+            {isAutoSaving && (
+              <div className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/50 flex items-center gap-1 animate-pulse">
+                <Save className="w-3 h-3" />
+                <span>Auto-Guardado</span>
+              </div>
+            )}
+
             <div
               className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 border ${
                 obsStatus.streaming
@@ -788,8 +913,20 @@ export default function App() {
 
       {/* Main Content Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-8 space-y-6">
+        {/* Game World & Exploration Tab */}
+        {activeTab === "game" && <GameWorldView />}
+
+        {/* Inventory System Tab */}
+        {activeTab === "inventory" && <InventoryMenu />}
+
+        {/* Save & Load System Tab */}
+        {activeTab === "saves" && <SaveLoadManager />}
+
         {activeTab === "dashboard" && (
           <div className="space-y-6">
+            {/* Subsystem Health Check Banner */}
+            <StartupHealthCheck />
+
             {/* Top Grid: Avatar Preview + Stream Controls + Scene Switcher */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Left Column: 3D Avatar Stage Card */}
@@ -801,6 +938,9 @@ export default function App() {
                   </div>
 
                   <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] bg-pink-950 text-pink-300 border border-pink-500/40 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">
+                      Pose: {animationClass || "HAPPY"}
+                    </span>
                     <span className="text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded-full font-bold">
                       {emotion}
                     </span>
@@ -876,15 +1016,35 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Speech Activity Monitor */}
-                <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${isSpeaking ? "bg-pink-500/20 text-pink-400 animate-bounce" : "bg-slate-800 text-slate-500"}`}>
-                    <Volume2 className="w-5 h-5" />
+                {/* Speech Activity Monitor & Gemini TTS Metadata */}
+                <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${isSpeaking ? "bg-pink-500/20 text-pink-400 animate-bounce" : "bg-slate-800 text-slate-500"}`}>
+                      <Volume2 className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] text-slate-400 uppercase font-bold">Síntesis de voz (Gemini TTS Metadata)</p>
+                        {latestTtsMetadata && (
+                          <span className="text-[9px] text-amber-300 font-mono">
+                            Score: {(latestTtsMetadata.sentimentScore * 100).toFixed(0)}%
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-200 truncate font-medium">"{latestSpeechText}"</p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] text-slate-400 uppercase font-bold">Última síntesis de voz (Gemini TTS)</p>
-                    <p className="text-xs text-slate-200 truncate font-medium">"{latestSpeechText}"</p>
-                  </div>
+
+                  {latestTtsMetadata && (
+                    <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-900 text-[10px] text-slate-400">
+                      <span className="font-bold text-slate-300">Tags de Sentimiento:</span>
+                      {latestTtsMetadata.keywords.map((kw, i) => (
+                        <span key={i} className="px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded text-cyan-300 font-mono">
+                          #{kw}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -893,6 +1053,11 @@ export default function App() {
                 <LiveControl />
                 <SceneSelector />
               </div>
+            </div>
+
+            {/* Middle Section: D3 TikTok Chat Activity & Keywords Heatmap */}
+            <div>
+              <TiktokActivityHeatmap />
             </div>
 
             {/* Bottom Full Width: Chat Engine */}
@@ -975,11 +1140,22 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Subtabs for Web, DNS Verification, Android SDK & Mockups */}
-              <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-850 text-xs gap-1">
+              {/* Subtabs for Live Webcast Connector, Web Login, DNS Verification, Android SDK & Mockups */}
+              <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-850 text-xs gap-1 flex-wrap sm:flex-nowrap">
+                <button
+                  onClick={() => setTiktokSubTab("live")}
+                  className={`flex-1 py-2.5 px-3 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+                    tiktokSubTab === "live"
+                      ? "bg-pink-500 text-white shadow-md shadow-pink-500/20"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <Radio className="w-3.5 h-3.5 text-pink-300" />
+                  <span>Webcast Push LIVE</span>
+                </button>
                 <button
                   onClick={() => setTiktokSubTab("web")}
-                  className={`flex-1 py-2.5 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+                  className={`flex-1 py-2.5 px-3 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-1.5 ${
                     tiktokSubTab === "web"
                       ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
                       : "text-slate-400 hover:text-slate-200"
@@ -990,18 +1166,18 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => setTiktokSubTab("dns")}
-                  className={`flex-1 py-2.5 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+                  className={`flex-1 py-2.5 px-3 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-1.5 ${
                     tiktokSubTab === "dns"
                       ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
                       : "text-slate-400 hover:text-slate-200"
                   }`}
                 >
                   <Globe className="w-3.5 h-3.5" />
-                  <span>Verificación DNS TXT</span>
+                  <span>Verificación DNS</span>
                 </button>
                 <button
                   onClick={() => setTiktokSubTab("android")}
-                  className={`flex-1 py-2.5 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+                  className={`flex-1 py-2.5 px-3 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-1.5 ${
                     tiktokSubTab === "android"
                       ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
                       : "text-slate-400 hover:text-slate-200"
@@ -1012,7 +1188,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => setTiktokSubTab("mockups")}
-                  className={`flex-1 py-2.5 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+                  className={`flex-1 py-2.5 px-3 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-1.5 ${
                     tiktokSubTab === "mockups"
                       ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
                       : "text-slate-400 hover:text-slate-200"
@@ -1022,6 +1198,12 @@ export default function App() {
                   <span>Maquetas UX</span>
                 </button>
               </div>
+
+              {tiktokSubTab === "live" && (
+                <div className="animate-fadeIn">
+                  <TiktokLiveConnectorCard />
+                </div>
+              )}
 
               {tiktokSubTab === "dns" && (
                 <div className="animate-fadeIn">
@@ -1042,25 +1224,41 @@ export default function App() {
                           </span>
                         </div>
                         <p className="text-slate-400 text-xs mt-1">
-                          Inicia sesión con tu cuenta de TikTok mediante el flujo seguro con Proof Key for Code Exchange (PKCE).
+                          Inicia sesión con tu cuenta de TikTok mediante el flujo seguro con Proof Key for Code Exchange (PKCE) o usa el conector Webcast Push sin claves.
                         </p>
                       </div>
 
-                      <a
-                        href="/api/tiktok/login"
-                        className="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs rounded-lg transition-all shadow-lg shadow-cyan-500/20 hover:scale-[1.02] flex items-center justify-center gap-2 cursor-pointer border border-cyan-300/40 shrink-0"
-                      >
-                        <Music2 className="w-4 h-4 text-slate-950" />
-                        <span>Continue with TikTok</span>
-                        <ExternalLink className="w-3.5 h-3.5 text-slate-950" />
-                      </a>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <a
+                          href="/api/tiktok/login?provider=tiktok"
+                          className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs rounded-lg transition-all shadow-lg shadow-cyan-500/20 hover:scale-[1.02] flex items-center justify-center gap-1.5 cursor-pointer border border-cyan-300/40 shrink-0"
+                        >
+                          <Music2 className="w-4 h-4 text-slate-950" />
+                          <span>Login Kit Oficial</span>
+                          <ExternalLink className="w-3.5 h-3.5 text-slate-950" />
+                        </a>
+                        <button
+                          onClick={() => setTiktokSubTab("live")}
+                          className="px-3.5 py-2.5 bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs rounded-lg transition shadow-md shadow-pink-500/20 flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Radio className="w-3.5 h-3.5" />
+                          <span>Webcast Push (Sin Claves)</span>
+                        </button>
+                        <a
+                          href="/api/tiktok/login?mode=sandbox"
+                          className="px-3 py-2.5 bg-slate-900 hover:bg-slate-850 text-cyan-300 border border-cyan-500/30 font-bold text-xs rounded-lg transition flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Simulación Demo</span>
+                        </a>
+                      </div>
                     </div>
 
                     <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800 text-[11px] font-mono text-slate-300 space-y-1">
                       <div className="text-slate-400 font-sans font-bold flex items-center gap-1.5 text-xs text-cyan-300 border-b border-slate-800 pb-1.5 mb-2">
                         <span>Parámetros de Integración Real (TikTok Developers)</span>
                       </div>
-                      <div><span className="text-slate-500">Client Key:</span> <code className="text-cyan-300">awvckv5za3nclqpe</code></div>
+                      <div><span className="text-slate-500">Client Key:</span> <code className="text-cyan-300">awvckv5za3nclqpe</code> (Configurable en .env o Secrets)</div>
                       <div><span className="text-slate-500">Scope:</span> <code className="text-emerald-400">user.info.basic</code></div>
                       <div><span className="text-slate-500">Redirect URI:</span> <code className="text-cyan-300">{window.location.origin}/api/tiktok/callback</code></div>
                       <div><span className="text-slate-500">Challenge Method:</span> <code className="text-cyan-300">S256 (SHA-256 Hex)</code></div>
@@ -1069,28 +1267,60 @@ export default function App() {
 
                   {/* OAuth Handshake Error / Success Alerts */}
                   {tiktokError && (
-                    <div className="bg-red-950/50 border border-red-500/40 p-4 rounded-lg space-y-2 animate-fadeIn">
-                      <div className="flex items-center gap-2 text-red-400 font-bold text-sm">
-                        <AlertTriangle className="w-5 h-5" />
-                        <span>Fallo en Autorización de TikTok (OAuth Handshake)</span>
+                    <div className="bg-red-950/60 border border-red-500/40 p-4 rounded-xl space-y-3 animate-fadeIn shadow-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-red-400 font-bold text-sm">
+                          <AlertTriangle className="w-5 h-5 text-red-400" />
+                          <span>Aviso de Autorización TikTok OAuth</span>
+                        </div>
+                        <button
+                          onClick={() => setTiktokError(null)}
+                          className="text-xs text-slate-400 hover:text-slate-200 cursor-pointer px-2 py-0.5 rounded bg-slate-900"
+                        >
+                          Cerrar
+                        </button>
                       </div>
-                      <p className="text-slate-300">
-                        Se devolvió el siguiente código de error durante el inicio de sesión seguro:
-                      </p>
-                      <div className="bg-slate-950/60 p-2.5 rounded font-mono text-[11px] text-red-300 border border-red-950/80">
-                        Código de Error: <strong className="text-red-400">{tiktokError}</strong>
+
+                      <div className="bg-slate-950/80 p-2.5 rounded font-mono text-[11px] text-red-300 border border-red-950/80">
+                        Detalle del Error: <strong className="text-red-400">{tiktokError}</strong>
                       </div>
-                      <div className="text-slate-400 leading-relaxed text-[11px] space-y-1">
-                        <p className="font-semibold text-slate-300">¿Cómo solucionar el error "{tiktokError}"?</p>
-                        {tiktokError.includes("unauthorized_client") ? (
-                          <p>
-                            Este error ocurre porque la URL desde la que intentas conectar no coincide exactamente con los <strong>Redirect URIs</strong> registrados en tu panel de TikTok Developers, o bien la aplicación se encuentra en modo Sandbox/Staging y tu cuenta de TikTok no ha sido agregada como una cuenta de prueba (Tester Account).
+
+                      <div className="text-slate-300 leading-relaxed text-xs space-y-2">
+                        <p className="font-semibold text-slate-200">¿Por qué ocurre y cómo resolverlo?</p>
+                        {tiktokError.toLowerCase().includes("invalid client") || tiktokError.toLowerCase().includes("invalid_client") ? (
+                          <p className="text-slate-400 text-[11px]">
+                            El <strong>Client ID / Client Key</strong> no está registrado o aprobado en el panel de TikTok Developers para este dominio. Puedes configurar tu clave en las variables de entorno (<code className="text-cyan-300">TIKTOK_CLIENT_KEY</code>) o usar directamente el <strong>Webcast Push LIVE</strong> que no requiere credenciales de desarrollador.
+                          </p>
+                        ) : tiktokError.toLowerCase().includes("unauthorized_client") ? (
+                          <p className="text-slate-400 text-[11px]">
+                            La URL de retorno (<code className="text-cyan-300">{window.location.origin}/api/tiktok/callback</code>) no coincide con los <strong>Redirect URIs</strong> configurados en TikTok Developers, o la app está en modo Sandbox y tu cuenta no es Tester.
                           </p>
                         ) : (
-                          <p>
-                            Verifica que las credenciales (Client Key y Client Secret) de TikTok Developers estén configuradas correctamente en los secretos de tu entorno y que la cuenta de usuario tenga los permisos de perfil aprobados.
+                          <p className="text-slate-400 text-[11px]">
+                            Verifica las credenciales en TikTok Developers o conéctate al stream directamente con el conector Webcast.
                           </p>
                         )}
+                      </div>
+
+                      {/* Instant Action Alternatives */}
+                      <div className="pt-2 border-t border-slate-900 flex items-center gap-2 flex-wrap">
+                        <button
+                          onClick={() => {
+                            setTiktokError(null);
+                            setTiktokSubTab("live");
+                          }}
+                          className="px-3.5 py-1.5 bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs rounded-lg transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-pink-500/20"
+                        >
+                          <Radio className="w-3.5 h-3.5" />
+                          <span>Conectar con Webcast Push LIVE (Recomendado)</span>
+                        </button>
+                        <a
+                          href="/api/tiktok/login?mode=sandbox"
+                          className="px-3.5 py-1.5 bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/30 font-bold text-xs rounded-lg transition flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Activar Modo Simulación</span>
+                        </a>
                       </div>
                     </div>
                   )}
@@ -1462,8 +1692,12 @@ export default function App() {
           </div>
         )}
 
+        {activeTab === "duix" && <DuixAvatarStudio />}
+        {activeTab === "streamerbot" && <StreamerBotStudio />}
         {activeTab === "workers-ai" && <WorkersAiRunner />}
         {activeTab === "workflows" && <CloudflareWorkflowsRunner />}
+        {activeTab === "enterprise" && <EnterpriseCoreDashboard />}
+        {activeTab === "sims" && <SimsEnterpriseStudio />}
         {activeTab === "executive" && (
           <div className="fixed inset-0 top-[65px] z-30">
             <ExecutiveGuide />

@@ -18,7 +18,13 @@ import {
   FileText,
   CreditCard,
   Map,
-  BarChart3
+  BarChart3,
+  Terminal,
+  Wrench,
+  GitBranch,
+  Package,
+  History,
+  HardDrive
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -30,6 +36,7 @@ const ExecutiveGuide: React.FC = () => {
     { id: "infra", title: "Infraestructura", icon: Cloud },
     { id: "architecture", title: "Arquitectura", icon: Building2 },
     { id: "legal", title: "Legal & Fintech", icon: Gavel },
+    { id: "agent-skills", title: "Habilidades", icon: Wrench },
     { id: "monetization", title: "Monetización", icon: TrendingUp },
     { id: "roadmap", title: "Roadmap", icon: Map },
   ];
@@ -364,6 +371,98 @@ const ExecutiveGuide: React.FC = () => {
                         <p className="text-[10px] font-bold text-slate-500 uppercase">Sede Central</p>
                         <p className="text-sm text-white">131 Continental Dr, Suite 305, Newark, DE 19713</p>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeSection === "agent-skills" && (
+                <div className="space-y-8">
+                  <header>
+                    <h2 className="text-3xl font-bold text-white mb-4">Habilidades del Agente (HECTRON-01)</h2>
+                    <p className="text-lg text-slate-400 leading-relaxed">
+                      Definición de la <strong className="text-cyan-400">Capa de Habilidades y Herramientas</strong> (Tool Gateway) para la automatización de procesos técnicos y operativos de Abadalabs.
+                    </p>
+                  </header>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    {[
+                      { 
+                        title: "Despliegue Ecosistema", 
+                        cmd: "deploy_project(name)", 
+                        desc: "Ejecución automatizada de scripts de despliegue (~/hectron-projects).",
+                        icon: Package,
+                        color: "cyan"
+                      },
+                      { 
+                        title: "Análisis Inferencia", 
+                        cmd: "analyze_code(topic)", 
+                        desc: "Enlace con el enrutador local de inferencia (Ollama) para auditoría técnica.",
+                        icon: Cpu,
+                        color: "blue"
+                      },
+                      { 
+                        title: "Gestión de Versiones", 
+                        cmd: "auto_commit(message)", 
+                        desc: "Flujo Git automatizado: add, commit y push con mensajes estructurados.",
+                        icon: GitBranch,
+                        color: "purple"
+                      },
+                      { 
+                        title: "Auditoría de Logs", 
+                        cmd: "show_logs(lines)", 
+                        desc: "Monitoreo en tiempo real de agent.log para diagnóstico proactivo.",
+                        icon: History,
+                        color: "orange"
+                      },
+                      { 
+                        title: "Respaldos Críticos", 
+                        cmd: "create_backup(project)", 
+                        desc: "Generación de archivos .tar.gz con marcas de tiempo para recuperación.",
+                        icon: HardDrive,
+                        color: "emerald"
+                      },
+                      { 
+                        title: "Monitor de Sistema", 
+                        cmd: "system_info()", 
+                        desc: "Reporte detallado de memoria (free) y almacenamiento (df).",
+                        icon: Terminal,
+                        color: "slate"
+                      }
+                    ].map((skill, i) => (
+                      <div key={i} className="p-5 rounded-2xl bg-slate-900 border border-slate-800 flex items-start gap-4">
+                        <div className={`w-10 h-10 rounded-lg bg-${skill.color}-500/10 flex items-center justify-center shrink-0`}>
+                          <skill.icon className={`text-${skill.color}-400`} size={20} />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-white text-sm mb-1">{skill.title}</h3>
+                          <p className="text-xs font-mono text-cyan-400/80 mb-2">{skill.cmd}</p>
+                          <p className="text-[10px] text-slate-500 leading-normal">{skill.desc}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl">
+                    <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                      <Code2 size={16} className="text-purple-400" /> Tool Gateway Implementation (Python)
+                    </h3>
+                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-[10px] overflow-x-auto">
+                      <pre className="text-slate-400">
+{`# HECTRON-01: skills.py
+# Capa de Habilidades y Herramientas del Agente
+
+def run_command(command):
+    try:
+        result = subprocess.run(command, shell=True, check=True, text=True, capture_output=True)
+        return result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        return f"Error de ejecución: {e.stderr.strip()}"
+
+def auto_commit(message=None):
+    commands = ["git add .", f'git commit -m "{message}"', "git push"]
+    # ... logic ...`}
+                      </pre>
                     </div>
                   </div>
                 </div>

@@ -1,10 +1,47 @@
 import { useContext, useState } from "react";
 import { BrainContext } from "../BrainContext";
-import { Play, Square, RefreshCw, Radio, Server, CheckCircle2, AlertTriangle, Monitor } from "lucide-react";
+import {
+  Play,
+  Square,
+  RefreshCw,
+  Radio,
+  Server,
+  CheckCircle2,
+  AlertTriangle,
+  Monitor,
+  Package,
+  Save,
+  Coins,
+  Sparkles,
+} from "lucide-react";
 
 export function LiveControl() {
-  const { agentUrl, obsStatus, setObsStatus, agentStatus, scenes, addLog } = useContext(BrainContext);
+  const {
+    agentUrl,
+    obsStatus,
+    setObsStatus,
+    agentStatus,
+    scenes,
+    addLog,
+    gameState,
+    spawnRandomWorldItem,
+    triggerAutoSave,
+    setActiveTab,
+  } = useContext(BrainContext);
   const [loading, setLoading] = useState(false);
+  const [quickNotice, setQuickNotice] = useState<string | null>(null);
+
+  const handleSpawnItem = () => {
+    const spawned = spawnRandomWorldItem();
+    setQuickNotice(`¡Reliquia "${spawned.name}" apareció en el escenario 3D!`);
+    setTimeout(() => setQuickNotice(null), 3000);
+  };
+
+  const handleQuickSave = () => {
+    triggerAutoSave("Guardado Rápido desde Panel Live");
+    setQuickNotice("¡Partida guardada correctamente!");
+    setTimeout(() => setQuickNotice(null), 3000);
+  };
 
   const handleStartStream = async () => {
     setLoading(true);
@@ -147,6 +184,61 @@ export function LiveControl() {
         <div className="space-y-1">
           <span className="text-slate-400">Escenas Disponibles</span>
           <p className="font-bold text-slate-200">{scenes.length || 6} Escenas</p>
+        </div>
+      </div>
+
+      {/* Quick notice toast */}
+      {quickNotice && (
+        <div className="bg-cyan-950 border border-cyan-400 text-cyan-200 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-2 animate-fade-in">
+          <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
+          <span>{quickNotice}</span>
+        </div>
+      )}
+
+      {/* Quick Game & Item Stream Actions */}
+      <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-slate-400 font-bold flex items-center gap-1">
+            <Coins className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-amber-300">{gameState?.player?.cyberCoins || 0} ₢</span>
+          </span>
+          <span className="text-slate-600">•</span>
+          <span className="text-slate-400">
+            Nivel: <strong className="text-cyan-400">{gameState?.player?.level || 1}</strong>
+          </span>
+          <span className="text-slate-600">•</span>
+          <span className="text-slate-400">
+            Items: <strong className="text-emerald-400">{gameState?.inventory?.length || 0}</strong>
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={handleSpawnItem}
+            className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 transition cursor-pointer flex items-center gap-1"
+            title="Generar objeto en el espacio 3D"
+          >
+            <Sparkles className="w-3 h-3" />
+            <span>Generar Reliquia</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("inventory")}
+            className="px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition cursor-pointer flex items-center gap-1"
+            title="Abrir Inventario"
+          >
+            <Package className="w-3 h-3" />
+            <span>Inventario</span>
+          </button>
+
+          <button
+            onClick={handleQuickSave}
+            className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer flex items-center gap-1"
+            title="Guardar Estado Actual"
+          >
+            <Save className="w-3 h-3 text-cyan-400" />
+            <span>Guardar</span>
+          </button>
         </div>
       </div>
     </div>

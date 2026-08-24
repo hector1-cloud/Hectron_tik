@@ -165,9 +165,9 @@ Responde ÚNICAMENTE en JSON con esta estructura exacta:
 `;
 
         const candidateModels = [
-          "gemini-3.5-flash-lite",
+          "gemini-3.7-flash",
           "gemini-3.1-flash-lite",
-          "gemini-2.5-flash-lite",
+          "gemini-flash-latest",
           "gemini-2.5-flash",
         ];
 
@@ -190,9 +190,12 @@ Responde ÚNICAMENTE en JSON con esta estructura exacta:
             const msg = String(err?.message || err);
             if (msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED")) {
               console.warn(`[Autonomy Engine] Model ${modelName} rate limited, switching to next candidate...`);
-              continue;
+            } else if (msg.includes("503") || msg.includes("UNAVAILABLE") || msg.includes("overloaded")) {
+              console.warn(`[Autonomy Engine] Model ${modelName} unavailable/503, switching to next candidate...`);
+            } else {
+              console.warn(`[Autonomy Engine] Model ${modelName} error (${msg.substring(0, 100)}...), switching to next candidate...`);
             }
-            break;
+            continue;
           }
         }
 
@@ -219,9 +222,9 @@ Responde ÚNICAMENTE en JSON con esta estructura exacta:
         }
       } catch (aiErr: any) {
         const errMsg = aiErr?.message || "";
-        if (errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("RESOURCE_EXHAUSTED")) {
+        if (errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("RESOURCE_EXHAUSTED") || errMsg.includes("503") || errMsg.includes("UNAVAILABLE")) {
           this.rateLimitUntil = Date.now() + 60000; // 60 second cooldown
-          console.warn("[Autonomy Engine] Gemini API rate limit reached. Cool down active for 60s. Using rich offline heuristic decision engine.");
+          console.warn("[Autonomy Engine] Gemini API rate limit or high demand reached. Cool down active for 60s. Using rich offline heuristic decision engine.");
         } else {
           console.warn("[Autonomy Engine] Gemini autonomy generation fallback:", errMsg);
         }

@@ -1,5 +1,18 @@
 export type Emotion = 'HAPPY' | 'SAD' | 'ANGRY' | 'SURPRISE' | 'FLIRT' | 'IDLE';
 
+export type AvatarAnimationClass = 'excited' | 'thinking' | 'happy' | 'surprised' | 'flirt' | 'angry' | 'sad' | 'idle';
+
+export interface TtsSentimentMetadata {
+  text: string;
+  emotion: Emotion;
+  animationClass: AvatarAnimationClass;
+  sentimentScore: number; // -1.0 to 1.0
+  keywords: string[];
+  pitch: number;
+  speed: number;
+  timestamp: string;
+}
+
 export type LogLevel = 'INFO' | 'WARN' | 'ERROR' | 'DEBUG';
 export type LogScope = 'SERVER' | 'FRONTEND' | 'AGENT' | 'TIKTOK' | '3D' | 'WORKFLOW';
 
@@ -49,6 +62,98 @@ export interface BrainState {
   roomId?: string | null;
 }
 
+export type ItemRarity = 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY';
+export type ItemCategory = 'RELIC' | 'CONSUMABLE' | 'STREAM_GEAR' | 'QUANTUM_CORE' | 'BADGE';
+export type AuraEffect = 'CYAN_NEON' | 'GOLDEN_GLOW' | 'PRISMATIC_RAINBOW' | 'VOID_PULSE' | 'EMBER_FLAME' | 'NONE';
+
+export interface ItemStatBonus {
+  hypeMultiplier?: number;
+  fpsBonus?: number;
+  streamKarma?: number;
+  ttsResonance?: number;
+  energyRestore?: number;
+  specialAbility?: string;
+}
+
+export interface GameItem {
+  id: string;
+  name: string;
+  description: string;
+  lore: string;
+  rarity: ItemRarity;
+  category: ItemCategory;
+  iconName: string;
+  quantity: number;
+  maxStack: number;
+  discoveredAt: string;
+  equipped?: boolean;
+  isConsumable?: boolean;
+  statBonus?: ItemStatBonus;
+  auraEffect?: AuraEffect;
+  valueCoins: number;
+}
+
+export interface SpawnedWorldItem {
+  id: string;
+  itemId: string;
+  name: string;
+  position: [number, number, number];
+  rarity: ItemRarity;
+  iconName: string;
+  collected: boolean;
+  spawnTime: number;
+}
+
+export interface SaveSlotMetadata {
+  slotId: string;
+  slotName: string;
+  timestamp: string;
+  isAutoSave?: boolean;
+  playtimeSeconds: number;
+  playerLevel: number;
+  cyberCoins: number;
+  activeScene: string;
+  activeEmotion: Emotion;
+  inventoryCount: number;
+  completionPercentage: number;
+}
+
+export interface GameStatePayload {
+  version: number;
+  timestamp: string;
+  player: {
+    name: string;
+    level: number;
+    xp: number;
+    xpToNextLevel: number;
+    cyberCoins: number;
+    energy: number;
+    maxEnergy: number;
+    reputation: number;
+  };
+  inventory: GameItem[];
+  equippedItems: string[];
+  activeAura: AuraEffect;
+  discoveredItemIds: string[];
+  worldSpawnedItems: SpawnedWorldItem[];
+  streamStats: {
+    totalViewersServed: number;
+    giftsReceivedCount: number;
+    itemsCollectedCount: number;
+    questsCompletedCount: number;
+  };
+  settings: {
+    autoSaveIntervalSeconds: number;
+    soundEffectsEnabled: boolean;
+    bgmVolume: number;
+    sfxVolume: number;
+    particleDensity: 'HIGH' | 'MEDIUM' | 'LOW';
+  };
+  activeScene: string;
+  activeEmotion: Emotion;
+  playtimeSeconds: number;
+}
+
 export interface BrainContextType {
   agentUrl: string;
   setAgentUrl: (url: string) => void;
@@ -60,15 +165,18 @@ export interface BrainContextType {
   setScenes: (scenes: string[]) => void;
   emotion: Emotion;
   setEmotion: (emotion: Emotion) => void;
+  animationClass: AvatarAnimationClass;
+  setAnimationClass: (animClass: AvatarAnimationClass) => void;
+  latestTtsMetadata: TtsSentimentMetadata | null;
   isAutonomous: boolean;
   setIsAutonomous: (val: boolean) => void;
   tiktokConnected: boolean;
   setTiktokConnected: (val: boolean) => void;
   messages: ChatMessage[];
   addMessage: (msg: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
-  activeTab: 'dashboard' | 'overlay' | 'agent' | 'tiktok' | 'logs' | 'performance' | 'autonomy' | 'workers-ai' | 'workflows' | 'executive';
-  setActiveTab: (tab: 'dashboard' | 'overlay' | 'agent' | 'tiktok' | 'logs' | 'performance' | 'autonomy' | 'workers-ai' | 'workflows' | 'executive') => void;
-  speakText: (text: string, emotion?: Emotion) => Promise<void>;
+  activeTab: 'dashboard' | 'game' | 'inventory' | 'saves' | 'overlay' | 'agent' | 'tiktok' | 'duix' | 'streamerbot' | 'logs' | 'performance' | 'autonomy' | 'workers-ai' | 'workflows' | 'executive' | 'enterprise' | 'sims';
+  setActiveTab: (tab: 'dashboard' | 'game' | 'inventory' | 'saves' | 'overlay' | 'agent' | 'tiktok' | 'duix' | 'streamerbot' | 'logs' | 'performance' | 'autonomy' | 'workers-ai' | 'workflows' | 'executive' | 'enterprise' | 'sims') => void;
+  speakText: (text: string, emotion?: Emotion, customAnimation?: AvatarAnimationClass) => Promise<void>;
   latestSpeechText: string;
   isSpeaking: boolean;
   logs: LogEntry[];
@@ -77,5 +185,48 @@ export interface BrainContextType {
   lodLevel: 'HIGH' | 'MEDIUM' | 'LOW';
   setLodLevel: (lod: 'HIGH' | 'MEDIUM' | 'LOW') => void;
   fps: number;
+  
+  // Game & Inventory & Save System state
+  gameState: GameStatePayload;
+  collectItem: (itemId: string, quantity?: number) => { success: boolean; item?: GameItem; message: string };
+  useItem: (itemId: string) => { success: boolean; message: string };
+  equipItem: (itemId: string) => { success: boolean; message: string };
+  discardItem: (itemId: string, quantity?: number) => { success: boolean; message: string };
+  spawnRandomWorldItem: () => SpawnedWorldItem;
+  pickupWorldItem: (spawnedId: string) => void;
+  saveGame: (slotId: string, slotName?: string) => Promise<{ success: boolean; message: string }>;
+  loadGame: (slotId: string) => Promise<{ success: boolean; message: string }>;
+  deleteSave: (slotId: string) => Promise<{ success: boolean; message: string }>;
+  exportSaveData: (slotId?: string) => string;
+  importSaveData: (jsonData: string) => Promise<{ success: boolean; message: string }>;
+  saveSlots: SaveSlotMetadata[];
+  isAutoSaving: boolean;
+  lastAutoSaveTime: string | null;
+  triggerAutoSave: (reason?: string) => Promise<void>;
+  gainExperience: (amount: number) => void;
+  gainCoins: (amount: number) => void;
+  soundEffect: (type: 'pickup' | 'save' | 'load' | 'equip' | 'use' | 'level_up' | 'error') => void;
 }
+
+export interface DuixCreateAvatarRequest {
+  conversationId: string;
+  ttsName: string;
+  name: string;
+  greetings: string;
+  profile: string;
+}
+
+export interface DuixCreateAvatarResponse {
+  code?: number;
+  msg?: string;
+  data?: {
+    avatarId?: string;
+    avatarUrl?: string;
+    conversationId?: string;
+    status?: string;
+    [key: string]: any;
+  };
+  [key: string]: any;
+}
+
 

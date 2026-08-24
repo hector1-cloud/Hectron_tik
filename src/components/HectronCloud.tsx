@@ -48,8 +48,11 @@ const EMOTION_COLORS: Record<Emotion, string> = {
   IDLE: "#00f0ff",    // Electric Cyan
 };
 
-export function HectronCloud({ emotion = "IDLE", isSpeaking = false }: HectronCloudProps) {
-  const { lodLevel } = useContext(BrainContext);
+export function HectronCloud({ emotion: propEmotion, isSpeaking: propIsSpeaking }: HectronCloudProps) {
+  const { lodLevel, animationClass, emotion: contextEmotion, isSpeaking: contextIsSpeaking } = useContext(BrainContext);
+
+  const activeEmotion = propEmotion || contextEmotion || "HAPPY";
+  const activeSpeaking = propIsSpeaking !== undefined ? propIsSpeaking : contextIsSpeaking;
 
   const groupRef = useRef<THREE.Group>(null!);
   const headRef = useRef<THREE.Group>(null!);
@@ -80,38 +83,72 @@ export function HectronCloud({ emotion = "IDLE", isSpeaking = false }: HectronCl
 
   useFrame(() => {
     const timer = timerRef.current;
-    // Update the timer on each frame
     timer.update();
     const time = timer.getElapsed();
 
-    // Subtle breathing animation
+    // 3D Avatar Body Poses based on animationClass
     if (groupRef.current) {
-      groupRef.current.position.y = Math.sin(time * 2) * 0.05 - 0.2;
-      groupRef.current.rotation.y = Math.sin(time * 0.8) * 0.08;
-    }
-
-    // Head micro tilt
-    if (headRef.current) {
-      headRef.current.rotation.z = Math.sin(time * 1.5) * 0.03;
-      if (emotion === "HAPPY") {
-        headRef.current.rotation.x = Math.sin(time * 4) * 0.05 - 0.05;
-      } else if (emotion === "FLIRT") {
-        headRef.current.rotation.z = Math.sin(time * 2) * 0.08 + 0.05;
+      if (animationClass === "excited") {
+        // High-energy energetic hop
+        groupRef.current.position.y = Math.abs(Math.sin(time * 7)) * 0.15 - 0.2;
+        groupRef.current.rotation.y = Math.sin(time * 1.5) * 0.15;
+      } else if (animationClass === "thinking") {
+        // Slow thoughtful tilt & float
+        groupRef.current.position.y = Math.sin(time * 1.2) * 0.03 - 0.2;
+        groupRef.current.rotation.y = -0.15 + Math.sin(time * 0.5) * 0.05;
+      } else if (animationClass === "surprised") {
+        // Sudden back step
+        groupRef.current.position.y = Math.sin(time * 4) * 0.08 - 0.15;
+        groupRef.current.position.z = -0.08;
+      } else if (animationClass === "sad") {
+        // Low drooped position
+        groupRef.current.position.y = -0.28 + Math.sin(time * 1.0) * 0.02;
+      } else {
+        // Standard breathing sway
+        groupRef.current.position.y = Math.sin(time * 2) * 0.05 - 0.2;
+        groupRef.current.rotation.y = Math.sin(time * 0.8) * 0.08;
       }
     }
 
-    // Dynamic twin-tail physics movement
-    if (leftTailRef.current && rightTailRef.current) {
-      leftTailRef.current.rotation.z = Math.sin(time * 2.5) * 0.12 - 0.2;
-      rightTailRef.current.rotation.z = -Math.sin(time * 2.5) * 0.12 + 0.2;
-
-      leftTailRef.current.rotation.x = Math.cos(time * 2) * 0.08;
-      rightTailRef.current.rotation.x = Math.cos(time * 2) * 0.08;
+    // Head Pose & Micro Movements
+    if (headRef.current) {
+      if (animationClass === "thinking") {
+        // Analytical head tilt towards chin
+        headRef.current.rotation.z = 0.22 + Math.sin(time * 1.5) * 0.03;
+        headRef.current.rotation.x = -0.12;
+      } else if (animationClass === "excited") {
+        // Nodding rapidly
+        headRef.current.rotation.x = Math.sin(time * 8) * 0.08 - 0.05;
+        headRef.current.rotation.z = Math.sin(time * 4) * 0.05;
+      } else if (animationClass === "flirt") {
+        // Cute sideways tilt
+        headRef.current.rotation.z = 0.18 + Math.sin(time * 2) * 0.04;
+        headRef.current.rotation.y = 0.12;
+      } else if (animationClass === "sad") {
+        // Drooping head down
+        headRef.current.rotation.x = 0.25;
+        headRef.current.rotation.z = 0.0;
+      } else {
+        headRef.current.rotation.z = Math.sin(time * 1.5) * 0.03;
+        headRef.current.rotation.x = activeEmotion === "HAPPY" ? Math.sin(time * 4) * 0.05 - 0.05 : 0;
+      }
     }
 
-    // Lip-sync talking animation
+    // Dynamic Twin-Tail Physics Movement driven by Animation Class
+    if (leftTailRef.current && rightTailRef.current) {
+      const tailSpeed = animationClass === "excited" ? 8 : animationClass === "thinking" ? 1.5 : 2.5;
+      const tailAmp = animationClass === "excited" ? 0.35 : animationClass === "thinking" ? 0.06 : 0.12;
+
+      leftTailRef.current.rotation.z = Math.sin(time * tailSpeed) * tailAmp - 0.2;
+      rightTailRef.current.rotation.z = -Math.sin(time * tailSpeed) * tailAmp + 0.2;
+
+      leftTailRef.current.rotation.x = Math.cos(time * (tailSpeed * 0.8)) * (tailAmp * 0.7);
+      rightTailRef.current.rotation.x = Math.cos(time * (tailSpeed * 0.8)) * (tailAmp * 0.7);
+    }
+
+    // Lip-Sync Talking Animation
     if (mouthRef.current) {
-      if (isSpeaking) {
+      if (activeSpeaking) {
         const mouthScaleY = 0.5 + Math.sin(time * 20) * 0.4;
         mouthRef.current.scale.set(1, mouthScaleY, 1);
       } else {
@@ -119,17 +156,17 @@ export function HectronCloud({ emotion = "IDLE", isSpeaking = false }: HectronCl
       }
     }
 
-    // Blinking scale
+    // Blinking Scale & Eye Expressions
     if (leftEyeRef.current && rightEyeRef.current) {
-      const eyeScaleY = blink ? 0.1 : 1;
+      const eyeScaleY = blink ? 0.1 : animationClass === "surprised" ? 1.3 : 1;
       leftEyeRef.current.scale.y = eyeScaleY;
       rightEyeRef.current.scale.y = eyeScaleY;
     }
 
-    // Update light color dynamically
+    // Update Light Color Dynamically
     if (lightRef.current) {
-      const targetColor = new THREE.Color(EMOTION_COLORS[emotion] || "#00ffff");
-      lightRef.current.color.lerp(targetColor, 0.05);
+      const targetColor = new THREE.Color(EMOTION_COLORS[activeEmotion] || "#00ffff");
+      lightRef.current.color.lerp(targetColor, 0.08);
     }
   });
 
@@ -146,7 +183,7 @@ export function HectronCloud({ emotion = "IDLE", isSpeaking = false }: HectronCl
         ref={lightRef}
         position={[3, 4, 3]}
         intensity={2.0}
-        color={EMOTION_COLORS[emotion]}
+        color={EMOTION_COLORS[activeEmotion]}
       />
       <ambientLight intensity={0.7} color="#00ffff" />
       <pointLight position={[-3, -2, -2]} intensity={0.8} color="#ff00cc" />
@@ -338,7 +375,7 @@ export function HectronCloud({ emotion = "IDLE", isSpeaking = false }: HectronCl
         {/* Holographic Glowing Stage Floor */}
         <mesh position={[0, -0.85, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[0.8, 1.8, 32]} />
-          <meshBasicMaterial color={EMOTION_COLORS[emotion]} transparent opacity={0.35} side={THREE.DoubleSide} />
+          <meshBasicMaterial color={EMOTION_COLORS[activeEmotion]} transparent opacity={0.35} side={THREE.DoubleSide} />
         </mesh>
         <mesh position={[0, -0.86, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <circleGeometry args={[0.8, 32]} />

@@ -28,20 +28,25 @@ export function AutonomyMetricsView() {
     setIsLoading(true);
     try {
       const [autoRes, dashRes] = await Promise.all([
-        fetch("/autonomy/status"),
+        fetch("/api/autonomy/status"),
         fetch("/api/metrics/dashboard"),
       ]);
 
       if (autoRes.ok) {
         const autoJson = await autoRes.json();
         setAutonomyStatus(autoJson);
+      } else {
+        console.warn(`Autonomy status fetch failed: ${autoRes.status} ${autoRes.statusText}`);
       }
+
       if (dashRes.ok) {
         const dashJson = await dashRes.json();
         setDashboardData(dashJson);
+      } else {
+        console.warn(`Dashboard metrics fetch failed: ${dashRes.status} ${dashRes.statusText}`);
       }
     } catch (err) {
-      console.error("Failed to fetch autonomy metrics:", err);
+      console.error("Critical failure fetching autonomy/metrics data:", err);
     } finally {
       setIsLoading(false);
     }
@@ -57,7 +62,7 @@ export function AutonomyMetricsView() {
     if (!autonomyStatus) return;
     try {
       const nextState = !autonomyStatus.enabled;
-      const res = await fetch("/autonomy/config", {
+      const res = await fetch("/api/autonomy/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled: nextState }),
@@ -73,7 +78,7 @@ export function AutonomyMetricsView() {
   const handleTriggerDecision = async () => {
     setIsTriggering(true);
     try {
-      const res = await fetch("/autonomy/trigger", {
+      const res = await fetch("/api/autonomy/trigger", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ triggerSource: "manual_dashboard_button" }),

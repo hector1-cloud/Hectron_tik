@@ -52,6 +52,24 @@
         "timestamp": { "type": "string", "format": "date-time" }
       },
       "required": ["metricName", "value", "timestamp"]
+    },
+    "SaveGame": {
+      "title": "SaveGame",
+      "description": "Stored game state with inventory, stats, and world progression",
+      "type": "object",
+      "properties": {
+        "slotId": { "type": "string", "maxLength": 50 },
+        "slotName": { "type": "string", "maxLength": 100 },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "playtimeSeconds": { "type": "number" },
+        "playerLevel": { "type": "number" },
+        "cyberCoins": { "type": "number" },
+        "activeScene": { "type": "string", "maxLength": 50 },
+        "activeEmotion": { "type": "string", "maxLength": 50 },
+        "inventoryItemsCount": { "type": "number" },
+        "statePayload": { "type": "string", "maxLength": 50000 }
+      },
+      "required": ["slotId", "slotName", "timestamp", "statePayload"]
     }
   },
   "firestore": {
@@ -70,6 +88,10 @@
     "/user_metrics/{metricId}": {
       "schema": { "$ref": "#/entities/UserMetric" },
       "description": "Collection of user analytics metrics"
+    },
+    "/save_games/{saveId}": {
+      "schema": { "$ref": "#/entities/SaveGame" },
+      "description": "Collection of saved game states and progress slots"
     }
   }
 }

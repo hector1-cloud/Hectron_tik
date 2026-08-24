@@ -21,8 +21,8 @@ export function TiktokDnsGuide() {
 
   const RECORD_TYPE = "TXT";
   const RECORD_HOST = "@";
-  const DOMAIN_TARGET = "hectron-tik.vercel.app";
-  const VERIFICATION_CODE = "tiktok-developers-site-verification=il5ZAosOEklehdHHP9lwO2rxTPQ1qwod";
+  const DOMAIN_TARGET = "hectron-streamer-studio.ai.studio";
+  const VERIFICATION_CODE = "tiktok-developers-site-verification=58o0bO0w67EDeqScw66ZzU4OoMCxGZel";
 
   const handleCopy = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
@@ -35,10 +35,10 @@ export function TiktokDnsGuide() {
     setTestResult(null);
     try {
       // Test fetching verification file endpoint
-      const res = await fetch(`/tiktokil5ZAosOEklehdHHP9lwO2rxTPQ1qwod.txt`);
+      const res = await fetch(`/tiktok-developers-site-verification=58o0bO0w67EDeqScw66ZzU4OoMCxGZel.txt`);
       if (res.ok) {
         const text = await res.text();
-        if (text.includes("il5ZAosOEklehdHHP9lwO2rxTPQ1qwod")) {
+        if (text.includes("58o0bO0w67EDeqScw66ZzU4OoMCxGZel")) {
           setTestResult({
             success: true,
             message: "¡Verificación local exitosa! El archivo estático y el metatag están respondiendo adecuadamente en el servidor."
