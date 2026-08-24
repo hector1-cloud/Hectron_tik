@@ -572,10 +572,11 @@ app.post("/api/tts", async (req, res) => {
 // 3. AI Chat Brain Handler
 app.post("/api/chat", async (req, res) => {
   try {
-    const { message, user = "Anónimo" } = req.body;
+    const message = req.body.message || req.body.mensaje;
+    const user = req.body.user || req.body.usuario || "Anónimo";
     if (!message) {
       addServerLog("WARN", "SERVER", "Chat request missing message payload");
-      return res.status(400).json({ error: "El mensaje es obligatorio" });
+      return res.status(400).json({ error: "El mensaje es obligatorio / Message is required" });
     }
 
     addServerLog("INFO", "SERVER", `Processing incoming chat message from [${user}]: "${message}"`);
@@ -658,6 +659,7 @@ INSTRUCCIONES CRÍTICAS:
       emotion,
       scene,
       response: responseText,
+      respuesta: responseText, // Compatibilidad con el script Python local
       user,
     });
   } catch (error: any) {

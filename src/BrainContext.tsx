@@ -232,8 +232,11 @@ export function BrainProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    let isConnecting = false;
+
     const connectWebSocket = () => {
-      if (!isMounted) return;
+      if (!isMounted || isConnecting) return;
+      isConnecting = true;
 
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const host = window.location.host;
@@ -242,9 +245,23 @@ export function BrainProvider({ children }: { children: ReactNode }) {
       addLog("DEBUG", "FRONTEND", `Estableciendo WebSocket con el servidor en ${wsUrl}...`);
 
       try {
+        if (ws) {
+          try { ws.close(); } catch (e) {}
+        }
+        
         ws = new WebSocket(wsUrl);
 
+        // Connection Timeout handler
+        const connectionTimeout = setTimeout(() => {
+          if (ws && ws.readyState !== WebSocket.OPEN) {
+             addLog("WARN", "FRONTEND", "Tiempo de espera de conexión WebSocket excedido (timeout).");
+             ws.close(); // This will trigger onclose which schedules reconnect
+          }
+        }, 10000); // 10 second connection timeout
+
         ws.onopen = () => {
+          clearTimeout(connectionTimeout);
+          isConnecting = false;
           if (!isMounted) return;
           const wasFirstConnect = reconnectAttempts === 0;
           reconnectAttempts = 0;
@@ -374,17 +391,20 @@ export function BrainProvider({ children }: { children: ReactNode }) {
         };
 
         ws.onclose = (event) => {
+          isConnecting = false;
           if (!isMounted) return;
           addLog("WARN", "FRONTEND", `Conexión perdida con el servidor de HECTRON (Código: ${event.code}). Intentando reconectar en segundo plano...`);
           scheduleReconnect();
         };
 
         ws.onerror = (error) => {
+          isConnecting = false;
           if (!isMounted) return;
           // Log gracefully to avoid throwing uncaught console.error during server restarts or transient disconnects
           console.log("WebSocket connecting/reconnecting status...");
         };
       } catch (err: any) {
+        isConnecting = false;
         addLog("ERROR", "FRONTEND", `Error al inicializar WebSocket: ${err?.message || String(err)}`);
         scheduleReconnect();
       }

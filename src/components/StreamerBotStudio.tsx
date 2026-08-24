@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { StreamerbotClient } from "@streamerbot/client";
 import {
   Cable,
   CheckCircle2,
@@ -26,56 +27,70 @@ export function StreamerBotStudio() {
   const [logs, setLogs] = useState<{ time: string; type: "IN" | "OUT" | "INFO" | "ERROR"; msg: string }[]>([]);
   const [copiedCode, setCopiedCode] = useState(false);
   
-  const wsRef = useRef<WebSocket | null>(null);
+  const clientRef = useRef<StreamerbotClient | null>(null);
 
   const addLog = (type: "IN" | "OUT" | "INFO" | "ERROR", msg: string) => {
     setLogs((prev) => [{ time: new Date().toLocaleTimeString(), type, msg }, ...prev].slice(0, 50));
   };
 
-  const connect = () => {
-    if (wsRef.current) {
-      wsRef.current.close();
+  const connect = async () => {
+    if (clientRef.current) {
+      await clientRef.current.disconnect();
+      clientRef.current = null;
     }
     
     setIsConnecting(true);
     setConnectionError(null);
-    addLog("INFO", `Connecting to ${wsUrl}...`);
+    addLog("INFO", `Connecting to ${wsUrl} via @streamerbot/client...`);
     
     try {
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
+      let parsedUrl;
+      try {
+        parsedUrl = new URL(wsUrl);
+      } catch {
+        throw new Error("Formato de URL WebSocket inválido. Usa algo como ws://127.0.0.1:8080/");
+      }
 
-      ws.onopen = () => {
-        setIsConnected(true);
-        setIsConnecting(false);
-        addLog("INFO", "Connected to Streamer.bot WebSocket!");
-      };
+      const host = parsedUrl.hostname;
+      const port = parsedUrl.port ? parseInt(parsedUrl.port, 10) : 8080;
+      const endpoint = parsedUrl.pathname || '/';
+      const scheme = parsedUrl.protocol.replace(':', '') as 'ws' | 'wss';
 
-      ws.onclose = () => {
-        setIsConnected(false);
-        setIsConnecting(false);
-        addLog("INFO", "Disconnected from Streamer.bot.");
-      };
-
-      ws.onerror = (e) => {
-        setIsConnecting(false);
-        setConnectionError("Connection failed. Make sure Streamer.bot WebSocket server is running on the specified URL and port.");
-        addLog("ERROR", "WebSocket connection error.");
-      };
-
-      ws.onmessage = (e) => {
-        try {
-          const data = JSON.parse(e.data);
-          addLog("IN", JSON.stringify(data, null, 2));
-          
-          if (data.action === "sendChatbotMessage") {
-             const chatMsg = data.args?.message || "No message provided in args";
-             addLog("INFO", `💬 CHATBOT: ${chatMsg}`);
+      const client = new StreamerbotClient({
+        scheme,
+        host,
+        port,
+        endpoint,
+        immediate: true,
+        autoReconnect: false,
+        onConnect: (info) => {
+          setIsConnected(true);
+          setIsConnecting(false);
+          addLog("INFO", `Connected to Streamer.bot (Instance: ${info?.instanceId || 'Unknown'})`);
+        },
+        onDisconnect: () => {
+          setIsConnected(false);
+          setIsConnecting(false);
+          addLog("INFO", "Disconnected from Streamer.bot.");
+        },
+        onError: (err) => {
+          setIsConnecting(false);
+          setConnectionError(err.message || "WebSocket connection error");
+          addLog("ERROR", err.message || "WebSocket error");
+        },
+        onData: (data) => {
+          if (data && typeof data === 'object') {
+            addLog("IN", JSON.stringify(data, null, 2));
+            if (data.action === "sendChatbotMessage") {
+               const chatMsg = data.args?.message || "No message provided in args";
+               addLog("INFO", `💬 CHATBOT: ${chatMsg}`);
+            }
           }
-        } catch (err) {
-          addLog("IN", e.data);
         }
-      };
+      });
+      
+      clientRef.current = client;
+
     } catch (err: any) {
       setIsConnecting(false);
       setConnectionError(err.message);
@@ -83,10 +98,10 @@ export function StreamerBotStudio() {
     }
   };
 
-  const disconnect = () => {
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
+  const disconnect = async () => {
+    if (clientRef.current) {
+      await clientRef.current.disconnect();
+      clientRef.current = null;
     }
   };
 
@@ -113,33 +128,28 @@ public class CPHInline
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
-  const sendTestAction = (e: React.FormEvent) => {
+  const sendTestAction = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!wsRef.current || !isConnected) return;
+    if (!clientRef.current || !isConnected) return;
     
     if (!testActionName.trim()) {
       addLog("ERROR", "Action name cannot be empty.");
       return;
     }
 
-    const payload = {
-      request: "DoAction",
-      action: {
-        name: testActionName.trim()
-      },
-      args: {
+    try {
+      addLog("OUT", `Executing DoAction: ${testActionName.trim()}`);
+      await clientRef.current.doAction(testActionName.trim(), {
         userId: "123456789",
         username: testUsername,
         nickname: testUsername,
         commandParams: testMessage,
         profilePicturUrl: "https://via.placeholder.com/150",
         platform: "tiktok"
-      },
-      id: `test_${Date.now()}`
-    };
-
-    wsRef.current.send(JSON.stringify(payload));
-    addLog("OUT", `Sent DoAction: ${testActionName.trim()}`);
+      });
+    } catch (err: any) {
+      addLog("ERROR", `Failed to execute action: ${err.message}`);
+    }
   };
 
   return (

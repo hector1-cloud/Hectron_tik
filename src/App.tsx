@@ -1,4 +1,4 @@
-import { useContext, useState, useEffect } from "react";
+import { useContext, useState, useEffect, Suspense, lazy } from "react";
 import { testFirestoreConnection } from "./lib/firebase";
 import { BrainContext } from "./BrainContext";
 import { LiveControl } from "./components/LiveControl";
@@ -14,9 +14,9 @@ import { TiktokTokenExchange } from "./components/TiktokTokenExchange";
 import { TiktokLiveConnectorCard } from "./components/TiktokLiveConnectorCard";
 import { WorkersAiRunner } from "./components/WorkersAiRunner";
 import { CloudflareWorkflowsRunner } from "./components/CloudflareWorkflowsRunner";
-import { EnterpriseCoreDashboard } from "./components/EnterpriseCoreDashboard";
-import { SimsEnterpriseStudio } from "./components/SimsEnterpriseStudio";
-import { DuixAvatarStudio } from "./components/DuixAvatarStudio";
+const EnterpriseCoreDashboard = lazy(() => import("./components/EnterpriseCoreDashboard").then(m => ({ default: m.EnterpriseCoreDashboard })));
+const SimsEnterpriseStudio = lazy(() => import("./components/SimsEnterpriseStudio").then(m => ({ default: m.SimsEnterpriseStudio })));
+const DuixAvatarStudio = lazy(() => import("./components/DuixAvatarStudio").then(m => ({ default: m.DuixAvatarStudio })));
 import { StreamerBotStudio } from "./components/StreamerBotStudio";
 import { TiktokActivityHeatmap } from "./components/TiktokActivityHeatmap";
 import ExecutiveGuide from "./components/ExecutiveGuide";
@@ -1692,12 +1692,14 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === "duix" && <DuixAvatarStudio />}
-        {activeTab === "streamerbot" && <StreamerBotStudio />}
-        {activeTab === "workers-ai" && <WorkersAiRunner />}
-        {activeTab === "workflows" && <CloudflareWorkflowsRunner />}
-        {activeTab === "enterprise" && <EnterpriseCoreDashboard />}
-        {activeTab === "sims" && <SimsEnterpriseStudio />}
+        <Suspense fallback={<div className="flex items-center justify-center p-12 text-slate-400">Cargando módulo...</div>}>
+          {activeTab === "duix" && <DuixAvatarStudio />}
+          {activeTab === "streamerbot" && <StreamerBotStudio />}
+          {activeTab === "workers-ai" && <WorkersAiRunner />}
+          {activeTab === "workflows" && <CloudflareWorkflowsRunner />}
+          {activeTab === "enterprise" && <EnterpriseCoreDashboard />}
+          {activeTab === "sims" && <SimsEnterpriseStudio />}
+        </Suspense>
         {activeTab === "executive" && (
           <div className="fixed inset-0 top-[65px] z-30">
             <ExecutiveGuide />
