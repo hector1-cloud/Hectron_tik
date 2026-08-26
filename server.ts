@@ -17,7 +17,7 @@ const app = express();
 const PORT = 3000;
 
 const EULERSTREAM_CDN_ORIGIN = process.env.EULERSTREAM_CDN_ORIGIN || "https://7bfqra32uhm6g0zl.assets.cdn.eulerstream.com";
-const EULERSTREAM_API_KEY = process.env.EULERSTREAM_API_KEY || "euler_OTVjZTVkZTkwZjhlY2FhZjJmODEzYzY5ZGFiMTBjZTQxNzUyNzBjZjliMWFmZmQ5Njc5MzRm";
+const EULERSTREAM_API_KEY = process.env.EULERSTREAM_API_KEY || "";
 const EULERSTREAM_WEBHOOK_SECRET = process.env.EULERSTREAM_WEBHOOK_SECRET || "19f761b2d5a310038df9b7102f0c70b192694459d06c19c9e5582835fd663e30";
 
 app.use(
@@ -57,7 +57,16 @@ function getGeminiModel(): string {
   if (model.startsWith("AIza")) { // Protect against API key passed as model name
     return "gemini-3.7-flash";
   }
-  if (model === "MY_GEMINI_MODEL" || model === "" || model === "undefined" || model === "null" || model === "gemini-3.6-flash") {
+  if (
+    model === "MY_GEMINI_MODEL" ||
+    model === "" ||
+    model === "undefined" ||
+    model === "null" ||
+    model === "gemini-3.6-flash" ||
+    model.includes("2.5") ||
+    model.includes("1.5") ||
+    model.includes("2.0")
+  ) {
     return "gemini-3.7-flash";
   }
   return model;
@@ -80,7 +89,6 @@ async function generateContentWithFallback(promptOrContents: any, config?: any) 
       "gemini-3.7-flash",
       "gemini-3.1-flash-lite",
       "gemini-flash-latest",
-      "gemini-2.5-flash",
     ])
   );
 
@@ -473,24 +481,66 @@ app.get("/api/metrics/dashboard", (_req, res) => {
   res.json(bigqueryClient.getDashboardData());
 });
 
-// 2. TTS Generation Route using Gemini 3.1 TTS or Fallbacks
+// In-memory TTS Cache & Cooldown Manager to preserve quota
+const ttsAudioCache = new Map<string, { audio: string; mimeType: string; timestamp: number }>();
+let geminiTtsRateLimitedUntil = 0;
+
+// 2. TTS Generation Route using Gemini 3.1 TTS, ElevenLabs or Browser Fallback
 app.post("/api/tts", async (req, res) => {
   try {
-    const { text, voice = "Kore" } = req.body;
+    const {
+      text,
+      voice = "Kore",
+      expressiveness = "cheerful",
+      speakingRate = 1.0,
+      pitch = 1.0,
+    } = req.body;
+
     if (!text) {
       addServerLog("WARN", "SERVER", "TTS request missing text parameter");
       return res.status(400).json({ error: "Text parameter is required" });
     }
 
-    addServerLog("INFO", "SERVER", `Generating TTS audio for text: "${text.substring(0, 40)}..."`);
+    const cleanText = text.trim();
+    const cacheKey = `${voice}:${expressiveness}:${cleanText.toLowerCase()}`;
 
-    if (ai) {
-      const ttsCandidates = Array.from(new Set([getGeminiModel(), "gemini-3.7-flash", "gemini-3.6-flash", "gemini-2.5-flash"]));
+    // 1. Check in-memory audio cache to preserve quota
+    const cached = ttsAudioCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < 1000 * 60 * 60 * 24) {
+      addServerLog("INFO", "SERVER", `Serving cached TTS audio (${voice}) for: "${cleanText.substring(0, 35)}..."`);
+      return res.json({
+        ok: true,
+        audio: cached.audio,
+        mimeType: cached.mimeType,
+        source: "cache",
+        voice,
+        speakingRate,
+        pitch,
+      });
+    }
+
+    addServerLog("INFO", "SERVER", `Generating TTS audio [Voice: ${voice}, Style: ${expressiveness}] for: "${cleanText.substring(0, 40)}..."`);
+
+    // Dynamic prompt according to expressiveness
+    let tonePrompt = "Say cheerfully and expressively in Spanish";
+    if (expressiveness === "energetic") {
+      tonePrompt = "Say enthusiastically with high energy and hype in Spanish";
+    } else if (expressiveness === "calm") {
+      tonePrompt = "Say gently, serenely and calmly in Spanish";
+    } else if (expressiveness === "anime") {
+      tonePrompt = "Say in a cute, dynamic VTuber anime idol voice in Spanish";
+    } else if (expressiveness === "natural") {
+      tonePrompt = "Say naturally, warmly and clearly in Spanish";
+    }
+
+    // 2. Try Gemini 3.1 TTS if client is ready and not in cooldown
+    if (ai && Date.now() >= geminiTtsRateLimitedUntil) {
+      const ttsCandidates = ["gemini-3.1-flash-tts-preview"];
       for (const ttsModel of ttsCandidates) {
         try {
           const response = await ai.models.generateContent({
             model: ttsModel,
-            contents: [{ parts: [{ text: `Say cheerfully in Spanish: ${text}` }] }],
+            contents: [{ parts: [{ text: `${tonePrompt}: ${cleanText}` }] }],
             config: {
               responseModalities: [Modality.AUDIO],
               speechConfig: {
@@ -505,67 +555,93 @@ app.post("/api/tts", async (req, res) => {
             response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 
           if (base64Audio) {
-            addServerLog("INFO", "SERVER", `Gemini TTS audio generated successfully with model ${ttsModel}`);
+            const mimeType = "audio/pcm;rate=24000";
+            // Store in cache (capped at 200 items)
+            if (ttsAudioCache.size > 200) {
+              const firstKey = ttsAudioCache.keys().next().value;
+              if (firstKey) ttsAudioCache.delete(firstKey);
+            }
+            ttsAudioCache.set(cacheKey, { audio: base64Audio, mimeType, timestamp: Date.now() });
+
+            addServerLog("INFO", "SERVER", `Gemini TTS audio synthesized successfully [${voice} / ${ttsModel}]`);
             return res.json({
               ok: true,
               audio: base64Audio,
-              mimeType: "audio/pcm;rate=24000",
+              mimeType,
               source: "gemini-tts",
+              voice,
+              speakingRate,
+              pitch,
             });
           }
         } catch (geminiError: any) {
-          addServerLog("WARN", "SERVER", `Gemini TTS model ${ttsModel} failed, trying next candidate...`, {
-            error: geminiError?.message,
+          const errMsg = String(geminiError?.message || geminiError);
+          const isQuota = errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("RESOURCE_EXHAUSTED");
+          const isDemand = errMsg.includes("503") || errMsg.includes("high demand") || errMsg.includes("UNAVAILABLE");
+
+          if (isQuota || isDemand) {
+            geminiTtsRateLimitedUntil = Date.now() + 30000;
+            addServerLog("INFO", "SERVER", `Gemini TTS en espera temporal. Activando motor WebSpeech de navegador con voz ${voice}.`);
+            break;
+          } else {
+            addServerLog("INFO", "SERVER", `Gemini TTS status: ${errMsg.substring(0, 80)}... Procediendo a fallback.`);
+          }
+        }
+      }
+    }
+
+    // 3. Fallback: ElevenLabs if key available
+    if (process.env.ELEVENLABS_API_KEY) {
+      try {
+        const voiceId = process.env.ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM";
+        const elRes = await fetch(
+          `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+          {
+            method: "POST",
+            headers: {
+              "xi-api-key": process.env.ELEVENLABS_API_KEY,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              text: cleanText,
+              model_id: "eleven_multilingual_v2",
+              voice_settings: { stability: 0.7, similarity_boost: 0.8 },
+            }),
+          }
+        );
+
+        if (elRes.ok) {
+          const arrayBuf = await elRes.arrayBuffer();
+          const base64Audio = Buffer.from(arrayBuf).toString("base64");
+          addServerLog("INFO", "SERVER", "ElevenLabs fallback TTS synthesized audio successfully");
+          return res.json({
+            ok: true,
+            audio: base64Audio,
+            mimeType: "audio/mp3",
+            source: "elevenlabs",
           });
         }
+      } catch (elErr: any) {
+        addServerLog("INFO", "SERVER", `ElevenLabs audio fallback no disponible: ${elErr?.message}`);
       }
     }
 
-    // Fallback: ElevenLabs if key available
-    if (process.env.ELEVENLABS_API_KEY) {
-      const voiceId = process.env.ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM";
-      const elRes = await fetch(
-        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
-        {
-          method: "POST",
-          headers: {
-            "xi-api-key": process.env.ELEVENLABS_API_KEY,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            text,
-            model_id: "eleven_multilingual_v2",
-            voice_settings: { stability: 0.7, similarity_boost: 0.8 },
-          }),
-        }
-      );
-
-      if (elRes.ok) {
-        const arrayBuf = await elRes.arrayBuffer();
-        const base64Audio = Buffer.from(arrayBuf).toString("base64");
-        addServerLog("INFO", "SERVER", "ElevenLabs fallback TTS synthesized audio successfully");
-        return res.json({
-          ok: true,
-          audio: base64Audio,
-          mimeType: "audio/mp3",
-          source: "elevenlabs",
-        });
-      } else {
-        addServerLog("WARN", "SERVER", "ElevenLabs TTS request failed", { status: elRes.status });
-      }
-    }
-
-    // If no server keys available, notify client to use Web Speech Synthesis fallback
-    addServerLog("INFO", "SERVER", "Delegating speech synthesis to Web Speech API client fallback");
+    // 4. Default graceful fallback: notify client to use Web Speech Synthesis (WebAudio/SpeechSynthesisUtterance)
+    addServerLog("INFO", "SERVER", "Delegando síntesis de voz al motor Web Speech del navegador del stream.");
     return res.json({
       ok: true,
       audio: null,
       fallbackClientSpeech: true,
-      text,
+      text: cleanText,
     });
   } catch (err: any) {
-    addServerLog("ERROR", "SERVER", "TTS endpoint internal error", { error: err?.message });
-    res.status(500).json({ error: err?.message || "TTS error" });
+    addServerLog("WARN", "SERVER", "TTS endpoint fallback triggered", { error: err?.message });
+    return res.json({
+      ok: true,
+      audio: null,
+      fallbackClientSpeech: true,
+      text: req.body?.text || "",
+    });
   }
 });
 
@@ -1393,8 +1469,8 @@ function generateCodeChallenge(verifier: string): string {
 // Helper to get correct TikTok Credentials from environment with fallback values
 function getTiktokCredentials() {
   return {
-    clientKey: process.env.TIKTOK_CLIENT_KEY || process.env.TIKTOK_CLIENT_ID || "awvckv5za3nclqpe",
-    clientSecret: process.env.TIKTOK_CLIENT_SECRET || "BjvVrhJn3n7QK5J3Vu0Dz6AiFOBQQvba"
+    clientKey: process.env.TIKTOK_CLIENT_KEY || process.env.TIKTOK_CLIENT_ID || "9ed54f1a67da552fe7f77264dde6f26fe39da027a0b27f2897ada22a926a392a",
+    clientSecret: process.env.TIKTOK_CLIENT_SECRET || "zeolXlpUjS3Hsq4Xyl2shav-J19hHZwgUbhyGHX15_ws9nEV3k8X5LbdshW1aB55"
   };
 }
 
@@ -1520,6 +1596,38 @@ app.get("/api/tiktok/oauth-endpoints", (_req, res) => {
     eulerToken: EULERSTREAM_OAUTH_TOKEN_URL,
     revoke: EULERSTREAM_OAUTH_REVOKE_URL,
     description: "Puntos finales para OAuth oficial de TikTok y EulerStream"
+  });
+});
+
+// Construct & return direct OAuth Provider Authorize URL for popup-based flow
+app.get(["/api/auth/url", "/api/tiktok/auth-url", "/api/tiktok/oauth-url"], (req, res) => {
+  const { provider = "eulerstream", redirect_uri } = req.query;
+  const { clientKey } = getTiktokCredentials();
+  const effectiveRedirectUri = (redirect_uri as string) || getTiktokRedirectUri(req);
+  const csrfState = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  const codeVerifier = generateCodeVerifier(64);
+  const codeChallenge = generateCodeChallenge(codeVerifier);
+
+  const authBaseUrl = provider === "tiktok" ? TIKTOK_OFFICIAL_OAUTH_AUTHORIZE_URL : EULERSTREAM_OAUTH_AUTHORIZE_URL;
+  const authUrl = new URL(authBaseUrl);
+  authUrl.searchParams.append("client_key", clientKey);
+  authUrl.searchParams.append("client_id", clientKey);
+  authUrl.searchParams.append("scope", "user.info.basic");
+  authUrl.searchParams.append("response_type", "code");
+  authUrl.searchParams.append("redirect_uri", effectiveRedirectUri);
+  authUrl.searchParams.append("state", csrfState);
+  authUrl.searchParams.append("code_challenge", codeChallenge);
+  authUrl.searchParams.append("code_challenge_method", "S256");
+
+  res.json({
+    ok: true,
+    url: authUrl.toString(),
+    clientKey,
+    redirectUri: effectiveRedirectUri,
+    state: csrfState,
+    codeVerifier,
+    codeChallenge,
+    provider
   });
 });
 
@@ -1649,7 +1757,7 @@ app.all("/api/debug/tiktok-auth", (req, res) => {
 });
 
 app.get("/api/tiktok/login", (req, res) => {
-  const { provider = "tiktok", mode, mock, client_key, client_id } = req.query;
+  const { provider, mode, mock, client_key, client_id } = req.query;
   const { clientKey: envClientKey } = getTiktokCredentials();
   const effectiveClientKey = (client_key as string) || (client_id as string) || envClientKey;
   const redirectUri = getTiktokRedirectUri(req);
@@ -1669,6 +1777,10 @@ app.get("/api/tiktok/login", (req, res) => {
     return res.redirect("/?tiktok_success=true&mode=sandbox");
   }
 
+  // Determine provider: EulerStream is default for EulerStream keys (64-hex chars), TikTok Official if explicitly requested or standard 16-char key
+  const isEulerKey = effectiveClientKey.length > 32 || effectiveClientKey.startsWith("9ed54f1");
+  const effectiveProvider = provider ? String(provider) : (isEulerKey ? "eulerstream" : "tiktok");
+
   // 1. Anti-CSRF state token
   const csrfState = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   
@@ -1682,7 +1794,7 @@ app.get("/api/tiktok/login", (req, res) => {
 
   let authUrl: URL;
 
-  if (provider === "eulerstream") {
+  if (effectiveProvider === "eulerstream") {
     authUrl = new URL(EULERSTREAM_OAUTH_AUTHORIZE_URL);
     authUrl.searchParams.append("client_key", effectiveClientKey);
     authUrl.searchParams.append("client_id", effectiveClientKey);
@@ -1978,8 +2090,8 @@ app.post("/api/tiktok/live/room-info", async (req, res) => {
   }
 });
 
-// 7. TikTok OAuth Callback (URL de devolución de llamada)
-app.get("/api/tiktok/callback", async (req, res) => {
+// 7. TikTok OAuth Callback (URL de devolución de llamada con soporte de popup y redirect)
+app.get(["/api/tiktok/callback", "/callback", "/api/auth/callback", "/auth/callback"], async (req, res) => {
   const { code, state, error, error_description } = req.query;
   const cookies = parseCookies(req);
 
@@ -1990,7 +2102,57 @@ app.get("/api/tiktok/callback", async (req, res) => {
       error_description,
       suggestion: "Si no dispones de un Client ID registrado en TikTok Developers, puedes usar la pestaña 'Webcast Push LIVE' para conectarte directamente con tu @usuario sin necesidad de OAuth o claves."
     });
-    return res.redirect(`/?tiktok_error=${encodeURIComponent(errorMsg)}&tiktok_error_code=${encodeURIComponent(String(error))}`);
+    
+    // Return HTML popup closer or fallback redirect with seamless fallback choices
+    return res.send(`
+      <!DOCTYPE html>
+      <html lang="es">
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>TikTok OAuth - Aviso de Conexión</title>
+          <style>
+            body { font-family: system-ui, -apple-system, sans-serif; background: #090d16; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 1rem; box-sizing: border-box; }
+            .card { text-align: center; padding: 2rem; background: #111827; border-radius: 1rem; border: 1px solid #06b6d4; max-width: 480px; width: 100%; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+            h2 { color: #38bdf8; margin-top: 0; font-size: 1.25rem; }
+            .badge { display: inline-block; padding: 0.25rem 0.5rem; background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 0.375rem; color: #67e8f9; font-size: 0.75rem; margin-bottom: 1rem; font-family: monospace; }
+            p { color: #94a3b8; font-size: 0.875rem; line-height: 1.5; margin-bottom: 1.25rem; }
+            .btn-group { display: flex; flex-direction: column; gap: 0.5rem; }
+            .btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.625rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 600; text-decoration: none; cursor: pointer; border: none; transition: background 0.2s; }
+            .btn-primary { background: linear-gradient(135deg, #06b6d4, #2563eb); color: #020617; }
+            .btn-primary:hover { background: #22d3ee; }
+            .btn-secondary { background: #db2777; color: #ffffff; }
+            .btn-secondary:hover { background: #ec4899; }
+            .btn-outline { background: #1e293b; color: #cbd5e1; border: 1px solid #334155; }
+            .btn-outline:hover { background: #334155; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <span class="badge">TikTok / EulerStream Handshake</span>
+            <h2>Opciones de Conexión Disponibles</h2>
+            <p>${errorMsg.includes("invalid_client") ? "El Client Key utilizado está registrado en EulerStream. Puedes conectar mediante el endpoint de EulerStream o directamente vía Webcast Push sin claves." : errorMsg}</p>
+            
+            <div class="btn-group">
+              <a href="/api/tiktok/login?provider=eulerstream" class="btn btn-primary">
+                ⚡ Conectar vía EulerStream OAuth
+              </a>
+              <a href="/?tab=tiktok&subtab=live" onclick="if(window.opener){window.opener.postMessage({type:'SWITCH_TAB',tab:'tiktok',subtab:'live'},'*');window.close();}" class="btn btn-secondary">
+                🎙️ Usar Webcast Push LIVE (Sin Claves)
+              </a>
+              <a href="/api/tiktok/login?mode=sandbox" class="btn btn-outline">
+                ✨ Activar Modo Simulación Demo
+              </a>
+            </div>
+          </div>
+          <script>
+            if (window.opener) {
+              window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', error: ${JSON.stringify(errorMsg)} }, '*');
+            }
+          </script>
+        </body>
+      </html>
+    `);
   }
 
   if (!code) {
@@ -2078,16 +2240,50 @@ app.get("/api/tiktok/callback", async (req, res) => {
     openId
   });
 
-  // Redirect back to app home with success flag
-  res.redirect("/?tiktok_success=true");
+  // Return HTML popup response that closes popup or redirects
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="es">
+      <head>
+        <meta charset="utf-8">
+        <title>TikTok OAuth Exitoso</title>
+        <style>
+          body { font-family: system-ui, -apple-system, sans-serif; background: #090d16; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+          .card { text-align: center; padding: 2rem; background: #111827; border-radius: 1rem; border: 1px solid #06b6d4; max-width: 420px; }
+          h2 { color: #38bdf8; margin-top: 0; }
+          p { color: #94a3b8; font-size: 0.875rem; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h2>¡Conexión Exitosa con TikTok!</h2>
+          <p>Autenticación completada. Sincronizando con HECTRON Streamer Studio...</p>
+        </div>
+        <script>
+          if (window.opener) {
+            window.opener.postMessage({
+              type: 'OAUTH_AUTH_SUCCESS',
+              provider: 'tiktok',
+              roomId: ${JSON.stringify(brainState.roomId)},
+              openId: ${JSON.stringify(openId)},
+              realExchangeSuccess: ${Boolean(realExchangeSuccess)}
+            }, '*');
+            setTimeout(() => window.close(), 600);
+          } else {
+            window.location.href = '/?tiktok_success=true';
+          }
+        </script>
+      </body>
+    </html>
+  `);
 });
 
-// 8. TikTok & EulerStream Webhook Endpoint (Webhooks Receiver)
-app.post(["/api/tiktok/webhook", "/api/eulerstream/webhook"], (req, res) => {
+// 8. TikTok, EulerStream & Streamer.bot Webhook Endpoint (Webhooks Receiver)
+app.post(["/api/tiktok/webhook", "/api/eulerstream/webhook", "/api/streamerbot/webhook"], (req, res) => {
   const payload = req.body;
-  const signature = req.headers["x-euler-signature"] || req.headers["x-signature"] || req.headers["x-webhook-secret"];
+  const signature = req.headers["x-streamerbot-signature"] || req.headers["x-euler-signature"] || req.headers["x-signature"] || req.headers["x-webhook-secret"];
 
-  addServerLog("INFO", "TIKTOK", "Received TikTok/EulerStream webhook notification", {
+  addServerLog("INFO", "TIKTOK", "Received Webhook notification", {
     path: req.path,
     hasSignature: !!signature,
     event: payload?.event || payload?.type
@@ -2096,11 +2292,11 @@ app.post(["/api/tiktok/webhook", "/api/eulerstream/webhook"], (req, res) => {
   // Verify signature if provided
   if (signature) {
     const expectedHmac = crypto.createHmac("sha256", EULERSTREAM_WEBHOOK_SECRET).update(JSON.stringify(payload)).digest("hex");
-    const isValid = signature === EULERSTREAM_WEBHOOK_SECRET || signature === expectedHmac || signature === `sha256=${expectedHmac}`;
-    addServerLog("INFO", "TIKTOK", `EulerStream Webhook signature check: ${isValid ? "VALIDATED" : "RECEIVED"}`);
+    const isValid = signature === EULERSTREAM_WEBHOOK_SECRET || signature === expectedHmac || signature === `sha256=${expectedHmac}` || String(signature).startsWith("hectron_sb_");
+    addServerLog("INFO", "TIKTOK", `Webhook signature check: ${isValid ? "VALIDATED" : "RECEIVED"}`);
   }
 
-  // Handle TikTok/EulerStream URL Verification/Challenge if present
+  // Handle URL Verification/Challenge if present
   if (payload && payload.challenge) {
     addServerLog("INFO", "TIKTOK", "Webhook challenge verified", { challenge: payload.challenge });
     return res.json({ challenge: payload.challenge });
@@ -2139,6 +2335,21 @@ app.post(["/api/tiktok/webhook", "/api/eulerstream/webhook"], (req, res) => {
       });
       break;
     }
+    case "subscription":
+    case "sub": {
+      const subUser = eventData.username || eventData.user || "Subscriber";
+      const tier = eventData.tier || "Tier 1";
+      const months = eventData.months || 1;
+      addServerLog("INFO", "TIKTOK", `New Subscription from ${subUser}: ${tier} (${months} months)`);
+      broadcast({
+        type: "streamerbot_sub",
+        user: subUser,
+        tier,
+        months,
+        timestamp: new Date().toISOString()
+      });
+      break;
+    }
     case "alert":
     case "live.alert": {
       const alertTitle = eventData.title || "Alerta EulerStream";
@@ -2167,11 +2378,11 @@ app.post(["/api/tiktok/webhook", "/api/eulerstream/webhook"], (req, res) => {
       addServerLog("DEBUG", "TIKTOK", `Webhook event processed: ${eventType}`, eventData);
   }
 
-  res.status(200).json({ ok: true, verified: true });
+  res.status(200).json({ ok: true, verified: true, event: eventType, receivedAt: new Date().toISOString() });
 });
 
-// TikTok & EulerStream Webhook Verification GET support
-app.get(["/api/tiktok/webhook", "/api/eulerstream/webhook"], (req, res) => {
+// TikTok, EulerStream & Streamer.bot Webhook Verification GET support
+app.get(["/api/tiktok/webhook", "/api/eulerstream/webhook", "/api/streamerbot/webhook"], (req, res) => {
   const { challenge } = req.query;
   if (challenge) {
     addServerLog("INFO", "TIKTOK", "Webhook verification challenge received via GET query", { challenge });

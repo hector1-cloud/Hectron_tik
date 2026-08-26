@@ -375,7 +375,7 @@ class GeminAiService {
     private val apiKey = ""
     
     private val generativeModel = GenerativeModel(
-        modelName = "gemini-2.5-flash-preview-09-2025",
+        modelName = "gemini-3.7-flash",
         apiKey = apiKey,
         generationConfig = generationConfig {
             responseMimeType = "application/json"
@@ -908,7 +908,7 @@ fun NeedProgressBar(label: String, value: Float) {
                   <div>
                     <div className="font-bold text-slate-200">2. Google AI SDK (Gemini)</div>
                     <div className="text-slate-400 text-[11px]">
-                      Modelo <code className="text-cyan-300">gemini-2.5-flash</code> con <code className="text-cyan-300">application/json</code> response MIME type y parsing seguro.
+                      Modelo <code className="text-cyan-300">gemini-3.7-flash</code> con <code className="text-cyan-300">application/json</code> response MIME type y parsing seguro.
                     </div>
                   </div>
                 </div>

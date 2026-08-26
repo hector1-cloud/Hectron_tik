@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Server,
   Cpu,
@@ -21,7 +21,10 @@ import {
   Gem,
   ArrowUpRight,
   TrendingUp,
+  Wifi,
+  WifiOff
 } from "lucide-react";
+import { useWebSocketReconnection } from "../hooks/useWebSocketReconnection";
 
 interface Microservice {
   id: string;
@@ -88,6 +91,71 @@ export function EnterpriseCoreDashboard() {
   const [transactionStatus, setTransactionStatus] = useState<"idle" | "processing" | "success">("idle");
   const [selectedServiceFilter, setSelectedServiceFilter] = useState<string>("all");
 
+  const addLog = useCallback((service: string, type: ServiceLog["type"], message: string) => {
+    const newLog: ServiceLog = {
+      id: Date.now() + Math.floor(Math.random() * 1000),
+      timestamp: new Date().toLocaleTimeString(),
+      service,
+      type,
+      message
+    };
+    setLogs((prev) => [newLog, ...prev.slice(0, 49)]);
+  }, []);
+
+  // Resilient WebSocket connection for real-time telemetry, logs, and events
+  const protocol = typeof window !== "undefined" && window.location.protocol === "https:" ? "wss:" : "ws:";
+  const host = typeof window !== "undefined" ? window.location.host : "localhost";
+  const wsUrl = `${protocol}//${host}/api/brain/ws`;
+
+  const { isConnected, isConnecting, sendMessage, forceReconnect } = useWebSocketReconnection({
+    url: wsUrl,
+    onOpen: () => {
+      addLog("gateway", "INFO", "Enlace WebSocket de telemetría Enterprise establecido en vivo.");
+    },
+    onMessage: (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "state") {
+          if (data.activeViewers) {
+            setMetrics((m) => ({ ...m, activeUsers: Math.max(m.activeUsers, data.activeViewers) }));
+          }
+        } else if (data.type === "log" && data.entry) {
+          const entry = data.entry;
+          let serviceMapped = "gateway";
+          let typeMapped: ServiceLog["type"] = "INFO";
+          if (entry.scope === "OBS") {
+            serviceMapped = "universe";
+            typeMapped = "EVENT";
+          } else if (entry.scope === "TIKTOK") {
+            serviceMapped = "gateway";
+            typeMapped = "EVENT";
+          } else if (entry.scope === "AUTONOMY") {
+            serviceMapped = "autonomy";
+            typeMapped = entry.level === "ERROR" ? "WARN" : "INFO";
+          } else if (entry.scope === "CACHE") {
+            serviceMapped = "redis";
+            typeMapped = "CACHE";
+          }
+          addLog(serviceMapped, typeMapped, `[${entry.scope}] ${entry.message}`);
+        } else if (data.type === "tiktok_gift") {
+          addLog("gateway", "PAYMENT", `TikTok Gift recibido: ${data.count || 1}x ${data.giftName || "Gift"} de ${data.user || "Viewer"}`);
+          setMetrics((m) => ({ ...m, revenueToday: m.revenueToday + (data.count || 1) * 0.5 }));
+        } else if (data.type === "tiktok_comment") {
+          addLog("gateway", "EVENT", `TikTok Chat (${data.user || "Viewer"}): ${data.text || ""}`);
+          setMetrics((m) => ({ ...m, commandCount: m.commandCount + 1 }));
+        }
+      } catch (err) {
+        console.error("Error procesando mensaje WebSocket Enterprise:", err);
+      }
+    },
+    onClose: (event) => {
+      addLog("gateway", "WARN", `Conexión WebSocket Enterprise interrumpida (Código: ${event.code}). Reconectando con backoff exponencial...`);
+    },
+    onError: () => {
+      console.log("WebSocket Enterprise status check...");
+    }
+  });
+
   // Live real-time CPU & telemetry fluctuation
   useEffect(() => {
     const interval = setInterval(() => {
@@ -106,18 +174,8 @@ export function EnterpriseCoreDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const addLog = (service: string, type: ServiceLog["type"], message: string) => {
-    const newLog: ServiceLog = {
-      id: Date.now() + Math.floor(Math.random() * 1000),
-      timestamp: new Date().toLocaleTimeString(),
-      service,
-      type,
-      message
-    };
-    setLogs((prev) => [newLog, ...prev.slice(0, 24)]);
-  };
-
   const handleSimulateEvent = (eventType = "universe.planet.discovered") => {
+    sendMessage({ type: "simulate_event", event: eventType, timestamp: Date.now() });
     addLog("rabbitmq", "EVENT", `Published event: ${eventType} (Payload streaming to BigQuery & Redis)`);
     setMetrics((m) => ({ ...m, commandCount: m.commandCount + 1 }));
   };
@@ -158,14 +216,44 @@ export function EnterpriseCoreDashboard() {
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center flex-wrap gap-2 md:gap-3">
+          {/* WebSocket Reconnection Status Badge */}
+          <div
+            className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-mono transition ${
+              isConnected
+                ? "bg-emerald-950/40 border-emerald-500/30 text-emerald-300"
+                : isConnecting
+                ? "bg-amber-950/40 border-amber-500/30 text-amber-300"
+                : "bg-rose-950/40 border-rose-500/30 text-rose-300"
+            }`}
+          >
+            {isConnected ? (
+              <>
+                <Wifi className="w-3.5 h-3.5 text-emerald-400" />
+                <span>WS: <strong className="text-emerald-400 font-semibold">EN LÍNEA</strong></span>
+              </>
+            ) : isConnecting ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+                <span>WS: <strong className="text-amber-400 font-semibold">RECONECTANDO...</strong></span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="w-3.5 h-3.5 text-rose-400" />
+                <span>WS: <strong className="text-rose-400 font-semibold">DESCONECTADO</strong></span>
+              </>
+            )}
+          </div>
+
           <div className="flex items-center space-x-2 bg-slate-850 px-3 py-1.5 rounded-lg border border-slate-750 text-xs text-slate-300">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
             <span>Cluster: <strong className="text-emerald-400 font-semibold">OPTIMAL (7/7)</strong></span>
           </div>
+
           <button
             onClick={() => {
-              addLog("gateway", "INFO", "Manual cluster state sync and healthcheck executed across all 7 nodes.");
+              forceReconnect();
+              addLog("gateway", "INFO", "Manual cluster state sync & WebSocket force reconnection executed.");
             }}
             className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium border border-slate-700 transition cursor-pointer"
           >

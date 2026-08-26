@@ -24,6 +24,7 @@ import { InventoryMenu } from "./components/InventoryMenu";
 import { SaveLoadManager } from "./components/SaveLoadManager";
 import { GameWorldView } from "./components/GameWorldView";
 import { StartupHealthCheck } from "./components/StartupHealthCheck";
+import { GeminiTtsVoiceSettingsCard } from "./components/GeminiTtsVoiceSettingsCard";
 import { jsPDF } from "jspdf";
 import {
   Mic,
@@ -1055,6 +1056,11 @@ export default function App() {
               </div>
             </div>
 
+            {/* Gemini TTS Voice Profiles & Fine-Tuning Settings Section */}
+            <div>
+              <GeminiTtsVoiceSettingsCard />
+            </div>
+
             {/* Middle Section: D3 TikTok Chat Activity & Keywords Heatmap */}
             <div>
               <TiktokActivityHeatmap />
@@ -1230,11 +1236,11 @@ export default function App() {
 
                       <div className="flex items-center gap-2 flex-wrap">
                         <a
-                          href="/api/tiktok/login?provider=tiktok"
-                          className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs rounded-lg transition-all shadow-lg shadow-cyan-500/20 hover:scale-[1.02] flex items-center justify-center gap-1.5 cursor-pointer border border-cyan-300/40 shrink-0"
+                          href="/api/tiktok/login?provider=eulerstream"
+                          className="px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs rounded-lg transition-all shadow-lg shadow-cyan-500/20 hover:scale-[1.02] flex items-center justify-center gap-1.5 cursor-pointer border border-cyan-300/40 shrink-0"
                         >
                           <Music2 className="w-4 h-4 text-slate-950" />
-                          <span>Login Kit Oficial</span>
+                          <span>Login Kit (EulerStream)</span>
                           <ExternalLink className="w-3.5 h-3.5 text-slate-950" />
                         </a>
                         <button
@@ -1251,14 +1257,22 @@ export default function App() {
                           <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
                           <span>Simulación Demo</span>
                         </a>
+                        <a
+                          href="/api/tiktok/login?provider=tiktok"
+                          className="px-3 py-2.5 bg-slate-950 hover:bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800 text-[11px] font-medium rounded-lg transition flex items-center gap-1 cursor-pointer"
+                          title="Requiere Client Key registrada directamente en developers.tiktok.com"
+                        >
+                          <span>TikTok Dev Portal Oficial</span>
+                          <ExternalLink className="w-3 h-3 text-slate-500" />
+                        </a>
                       </div>
                     </div>
 
                     <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800 text-[11px] font-mono text-slate-300 space-y-1">
                       <div className="text-slate-400 font-sans font-bold flex items-center gap-1.5 text-xs text-cyan-300 border-b border-slate-800 pb-1.5 mb-2">
-                        <span>Parámetros de Integración Real (TikTok Developers)</span>
+                        <span>Parámetros de Integración Configurados (OAuth PKCE)</span>
                       </div>
-                      <div><span className="text-slate-500">Client Key:</span> <code className="text-cyan-300">awvckv5za3nclqpe</code> (Configurable en .env o Secrets)</div>
+                      <div><span className="text-slate-500">Client ID / Key:</span> <code className="text-cyan-300">9ed54f1a67da552fe7f77264dde6f26fe39da027a0b27f2897ada22a926a392a</code></div>
                       <div><span className="text-slate-500">Scope:</span> <code className="text-emerald-400">user.info.basic</code></div>
                       <div><span className="text-slate-500">Redirect URI:</span> <code className="text-cyan-300">{window.location.origin}/api/tiktok/callback</code></div>
                       <div><span className="text-slate-500">Challenge Method:</span> <code className="text-cyan-300">S256 (SHA-256 Hex)</code></div>

@@ -1,6 +1,7 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useCallback } from "react";
 import { Radio, Wifi, WifiOff, Send, Gift, Heart, Users, CheckCircle2, AlertCircle, RefreshCw, Key, ShieldCheck, Sparkles, Play, ToggleLeft, ToggleRight } from "lucide-react";
 import { BrainContext } from "../BrainContext";
+import { useWebSocketReconnection } from "../hooks/useWebSocketReconnection";
 
 interface LiveEventItem {
   id: string;
@@ -43,89 +44,81 @@ export function TiktokLiveConnectorCard() {
   const [checkingLive, setCheckingLive] = useState<boolean>(false);
   const [manualText, setManualText] = useState<string>("");
 
-  // Poll status on mount & setup WebSocket listener
-  useEffect(() => {
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 4000);
-
-    // Setup WebSocket connection for realtime events
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/api/brain/ws`;
-    let ws: WebSocket | null = null;
-
-    try {
-      ws = new WebSocket(wsUrl);
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === "tiktok_comment") {
-            setLiveEvents((prev) => [
-              {
-                id: Math.random().toString(36).substring(7),
-                type: "chat",
-                user: msg.user || "Fan",
-                text: msg.text,
-                timestamp: new Date().toLocaleTimeString(),
-                isSimulated: msg.isSimulated,
-              },
-              ...prev.slice(0, 49),
-            ]);
-          } else if (msg.type === "tiktok_gift") {
-            setLiveEvents((prev) => [
-              {
-                id: Math.random().toString(36).substring(7),
-                type: "gift",
-                user: msg.user || "Fan",
-                giftName: msg.giftName,
-                count: msg.count,
-                timestamp: new Date().toLocaleTimeString(),
-                isSimulated: msg.isSimulated,
-              },
-              ...prev.slice(0, 49),
-            ]);
-          } else if (msg.type === "tiktok_like") {
-            setLiveEvents((prev) => [
-              {
-                id: Math.random().toString(36).substring(7),
-                type: "like",
-                user: msg.user || "Fan",
-                count: msg.count,
-                text: `+${msg.count || 1} Me Gusta ❤️`,
-                timestamp: new Date().toLocaleTimeString(),
-                isSimulated: msg.isSimulated,
-              },
-              ...prev.slice(0, 49),
-            ]);
-          } else if (msg.type === "tiktok_connected") {
-            fetchStatus();
-          } else if (msg.type === "tiktok_disconnected") {
-            fetchStatus();
-          }
-        } catch (e) {
-          // ignore
-        }
-      };
-    } catch (err) {
-      console.warn("WebSocket connection error:", err);
-    }
-
-    return () => {
-      clearInterval(interval);
-      if (ws) ws.close();
-    };
-  }, []);
-
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     try {
       const res = await fetch("/api/tiktok/live/status");
       if (res.ok) {
         const data = await res.json();
         setConnectionStatus(data);
       }
-    } catch (err) {
-      console.warn("Error fetching TikTok Live status:", err);
+    } catch (e) {
+      // Ignore network hiccup
     }
-  };
+  }, []);
+
+  // Poll status periodically
+  useEffect(() => {
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 4000);
+    return () => clearInterval(interval);
+  }, [fetchStatus]);
+
+  // Resilient WebSocket connection for realtime TikTok Live events
+  const protocol = typeof window !== "undefined" && window.location.protocol === "https:" ? "wss:" : "ws:";
+  const host = typeof window !== "undefined" ? window.location.host : "localhost";
+  const wsUrl = `${protocol}//${host}/api/brain/ws`;
+
+  useWebSocketReconnection({
+    url: wsUrl,
+    onMessage: (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "tiktok_comment") {
+          setLiveEvents((prev) => [
+            {
+              id: Math.random().toString(36).substring(7),
+              type: "chat",
+              user: msg.user || "Fan",
+              text: msg.text,
+              timestamp: new Date().toLocaleTimeString(),
+              isSimulated: msg.isSimulated,
+            },
+            ...prev.slice(0, 49),
+          ]);
+        } else if (msg.type === "tiktok_gift") {
+          setLiveEvents((prev) => [
+            {
+              id: Math.random().toString(36).substring(7),
+              type: "gift",
+              user: msg.user || "Fan",
+              giftName: msg.giftName,
+              count: msg.count,
+              timestamp: new Date().toLocaleTimeString(),
+              isSimulated: msg.isSimulated,
+            },
+            ...prev.slice(0, 49),
+          ]);
+        } else if (msg.type === "tiktok_like") {
+          setLiveEvents((prev) => [
+            {
+              id: Math.random().toString(36).substring(7),
+              type: "like",
+              user: msg.user || "Fan",
+              count: msg.count,
+              text: `+${msg.count || 1} Me Gusta ❤️`,
+              timestamp: new Date().toLocaleTimeString(),
+              isSimulated: msg.isSimulated,
+            },
+            ...prev.slice(0, 49),
+          ]);
+        } else if (msg.type === "tiktok_connected" || msg.type === "tiktok_disconnected") {
+          fetchStatus();
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+  });
 
   const handleConnect = async () => {
     if (!username.trim()) return;

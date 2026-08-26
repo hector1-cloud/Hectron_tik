@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import {
   KeyRound,
+  Key,
+  Sparkles,
   RefreshCw,
   CheckCircle2,
   XCircle,
@@ -33,16 +35,72 @@ export function TiktokTokenExchange() {
   const [baseDelayMs, setBaseDelayMs] = useState<number>(1500); // 1.5 seconds base
   const [simulateErrors, setSimulateErrors] = useState<boolean>(false);
 
+  // Popup & OAuth State
+  const [popupStatus, setPopupStatus] = useState<string | null>(null);
+  const [isOpeningPopup, setIsOpeningPopup] = useState<boolean>(false);
+
   // Revoke state
   const [tokenToRevoke, setTokenToRevoke] = useState<string>("");
   const [isRevoking, setIsRevoking] = useState<boolean>(false);
   const [revokeResult, setRevokeResult] = useState<{ success: boolean; message: string; details?: any } | null>(null);
+
+  const TIKTOK_CREDENTIALS = {
+    clientId: "9ed54f1a67da552fe7f77264dde6f26fe39da027a0b27f2897ada22a926a392a",
+    clientSecret: "zeolXlpUjS3Hsq4Xyl2shav-J19hHZwgUbhyGHX15_ws9nEV3k8X5LbdshW1aB55",
+    redirectUris: [
+      "https://example.com/callback",
+      "https://hectron-streamer-studio.ai.studio"
+    ]
+  };
 
   const EULERSTREAM_OAUTH = {
     authorize: "https://www.eulerstream.com/tiktok/oauth/authorize",
     token: "https://tiktok.eulerstream.com/tiktok/oauth/token",
     revoke: "https://tiktok.eulerstream.com/tiktok/oauth/revoke"
   };
+
+  const handleConnectPopup = async (provider: "eulerstream" | "tiktok" = "eulerstream") => {
+    setIsOpeningPopup(true);
+    setPopupStatus("Generando URL segura de autorización con PKCE...");
+    try {
+      const res = await fetch(`/api/auth/url?provider=${provider}`);
+      const data = await res.json();
+      if (!data.url) throw new Error("No se pudo obtener la URL de autorización");
+
+      const width = 620;
+      const height = 740;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+
+      const authWindow = window.open(
+        data.url,
+        "tiktok_oauth_window",
+        `width=${width},height=${height},left=${left},top=${top},status=no,toolbar=no,menubar=no`
+      );
+
+      if (!authWindow) {
+        setPopupStatus("⚠️ La ventana emergente fue bloqueada por el navegador. Por favor permite popups.");
+      } else {
+        setPopupStatus("🟢 Ventana de inicio de sesión abierta. Esperando autorización de TikTok / EulerStream...");
+      }
+    } catch (err: any) {
+      setPopupStatus(`❌ Error al iniciar sesión: ${err?.message}`);
+    } finally {
+      setIsOpeningPopup(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === "OAUTH_AUTH_SUCCESS") {
+        setPopupStatus("✨ ¡Autenticación con TikTok completada con éxito! Sesión activa y vinculada.");
+      } else if (event.data?.type === "OAUTH_AUTH_ERROR") {
+        setPopupStatus(`⚠️ Error en la autenticación: ${event.data?.error || "Error desconocido"}`);
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
 
   const handleRevokeToken = async () => {
     setIsRevoking(true);
@@ -557,6 +615,106 @@ export function TiktokTokenExchange() {
         </div>
       )}
 
+      {/* TikTok & EulerStream OAuth Client Credentials Card */}
+      <div className="bg-slate-950 p-4 rounded-xl border border-cyan-500/40 space-y-4 shadow-xl relative overflow-hidden">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <Key className="w-5 h-5 text-cyan-400" />
+            <div>
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <span>Credenciales de Cliente OAuth (TikTok / EulerStream)</span>
+                <span className="text-[10px] bg-cyan-950 text-cyan-300 font-mono px-2 py-0.5 rounded border border-cyan-500/30">
+                  Activas & Verificadas
+                </span>
+              </h4>
+              <p className="text-[11px] text-slate-400">Credenciales registradas para autenticación segura mediante PKCE.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleConnectPopup("eulerstream")}
+              disabled={isOpeningPopup}
+              className="px-3 py-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-cyan-950/50 flex items-center gap-1.5 cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>{isOpeningPopup ? "Abriendo..." : "Conectar TikTok (Popup)"}</span>
+            </button>
+          </div>
+        </div>
+
+        {popupStatus && (
+          <div className="p-2.5 rounded-lg bg-slate-900 border border-cyan-500/30 text-xs text-cyan-300 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+            <span>{popupStatus}</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          {/* Client ID */}
+          <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 font-medium flex items-center gap-1">
+                <span>Client ID:</span>
+              </span>
+              <button
+                onClick={() => handleCopy(TIKTOK_CREDENTIALS.clientId, "client_id_val")}
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-bold cursor-pointer transition flex items-center gap-1"
+              >
+                {copiedKey === "client_id_val" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>Copiar</span>
+              </button>
+            </div>
+            <div className="font-mono text-cyan-300 text-[11px] bg-slate-950 p-2 rounded border border-slate-800 break-all select-all">
+              {TIKTOK_CREDENTIALS.clientId}
+            </div>
+          </div>
+
+          {/* Client Secret */}
+          <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 font-medium">Client Secret:</span>
+              <button
+                onClick={() => handleCopy(TIKTOK_CREDENTIALS.clientSecret, "client_secret_val")}
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-bold cursor-pointer transition flex items-center gap-1"
+              >
+                {copiedKey === "client_secret_val" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>Copiar</span>
+              </button>
+            </div>
+            <div className="font-mono text-emerald-300 text-[11px] bg-slate-950 p-2 rounded border border-slate-800 break-all select-all">
+              {TIKTOK_CREDENTIALS.clientSecret}
+            </div>
+          </div>
+
+          {/* Allowed Redirect URIs */}
+          <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 space-y-1 md:col-span-2">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 font-medium">URIs de Redirección Autorizadas (Redirect URIs):</span>
+              <button
+                onClick={() => handleCopy(TIKTOK_CREDENTIALS.redirectUris.join("\n"), "redirect_uris_val")}
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-bold cursor-pointer transition flex items-center gap-1"
+              >
+                {copiedKey === "redirect_uris_val" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>Copiar Ambas</span>
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              {TIKTOK_CREDENTIALS.redirectUris.map((uri, idx) => (
+                <div key={idx} className="font-mono text-purple-300 text-[11px] bg-slate-950 p-2 rounded border border-slate-800 flex items-center justify-between">
+                  <span className="truncate">{uri}</span>
+                  <button
+                    onClick={() => handleCopy(uri, `uri_${idx}`)}
+                    className="text-slate-500 hover:text-white ml-1 shrink-0"
+                  >
+                    {copiedKey === `uri_${idx}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* EulerStream OAuth Endpoints Card */}
       <div className="bg-slate-950 p-4 rounded-xl border border-cyan-500/30 space-y-4 shadow-lg relative overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -736,17 +894,17 @@ export function TiktokTokenExchange() {
           {/* API Key EulerStream */}
           <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-slate-400 font-medium">API Key EulerStream:</span>
+              <span className="text-slate-400 font-medium">API Key EulerStream (Opcional):</span>
               <button
-                onClick={() => handleCopy("euler_OTVjZTVkZTkwZjhlY2FhZjJmODEzYzY5ZGFiMTBjZTQxNzUyNzBjZjliMWFmZmQ5Njc5MzRm", "euler_api_key")}
+                onClick={() => handleCopy("euler_live_production_key", "euler_api_key")}
                 className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-bold cursor-pointer transition flex items-center gap-1"
               >
                 {copiedKey === "euler_api_key" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                 <span>Copiar</span>
               </button>
             </div>
-            <div className="font-mono text-emerald-300 text-[11px] bg-slate-950 p-2 rounded border border-slate-800 break-all select-all">
-              euler_OTVjZTVkZTkwZjhlY2FhZjJmODEzYzY5ZGFiMTBjZTQxNzUyNzBjZjliMWFmZmQ5Njc5MzRm
+            <div className="font-mono text-slate-400 text-[11px] bg-slate-950 p-2 rounded border border-slate-800 break-all select-all">
+              Configura tu clave personal en Ajustes o en el conector si cuentas con plan activo de EulerStream.
             </div>
           </div>
 

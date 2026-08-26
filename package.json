@@ -9,6 +9,7 @@
     "start": "node dist/server.cjs",
     "agent": "node local-agent/src/index.mjs",
     "pc": "node scripts/start-pc.mjs",
+    "streamerbot:bridge": "node Streamer.bot/scripts/bridge.js",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
   },

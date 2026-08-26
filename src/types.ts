@@ -154,6 +154,18 @@ export interface GameStatePayload {
   playtimeSeconds: number;
 }
 
+export type GeminiVoiceName = "Kore" | "Puck" | "Charon" | "Fenrir" | "Aoede" | "Zephyr" | "Leda" | "Orus";
+
+export type TtsExpressiveness = "cheerful" | "energetic" | "calm" | "natural" | "anime";
+
+export interface TtsVoiceSettings {
+  voice: GeminiVoiceName;
+  speakingRate: number;
+  pitch: number;
+  expressiveness: TtsExpressiveness;
+  autoSpeechEnabled: boolean;
+}
+
 export interface BrainContextType {
   agentUrl: string;
   setAgentUrl: (url: string) => void;
@@ -176,7 +188,7 @@ export interface BrainContextType {
   addMessage: (msg: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
   activeTab: 'dashboard' | 'game' | 'inventory' | 'saves' | 'overlay' | 'agent' | 'tiktok' | 'duix' | 'streamerbot' | 'logs' | 'performance' | 'autonomy' | 'workers-ai' | 'workflows' | 'executive' | 'enterprise' | 'sims';
   setActiveTab: (tab: 'dashboard' | 'game' | 'inventory' | 'saves' | 'overlay' | 'agent' | 'tiktok' | 'duix' | 'streamerbot' | 'logs' | 'performance' | 'autonomy' | 'workers-ai' | 'workflows' | 'executive' | 'enterprise' | 'sims') => void;
-  speakText: (text: string, emotion?: Emotion, customAnimation?: AvatarAnimationClass) => Promise<void>;
+  speakText: (text: string, emotion?: Emotion, customAnimation?: AvatarAnimationClass, customVoiceConfig?: Partial<TtsVoiceSettings>) => Promise<void>;
   latestSpeechText: string;
   isSpeaking: boolean;
   logs: LogEntry[];
@@ -185,6 +197,12 @@ export interface BrainContextType {
   lodLevel: 'HIGH' | 'MEDIUM' | 'LOW';
   setLodLevel: (lod: 'HIGH' | 'MEDIUM' | 'LOW') => void;
   fps: number;
+  
+  // TTS Voice Settings
+  ttsVoiceSettings: TtsVoiceSettings;
+  setTtsVoiceSettings: React.Dispatch<React.SetStateAction<TtsVoiceSettings>>;
+  updateTtsVoiceSettings: (settings: Partial<TtsVoiceSettings>) => void;
+  resetTtsVoiceSettings: () => void;
   
   // Game & Inventory & Save System state
   gameState: GameStatePayload;

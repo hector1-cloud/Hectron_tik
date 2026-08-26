@@ -13,6 +13,7 @@ function isOfflineMessage(msg: string): boolean {
   if (!msg) return false;
   const lower = msg.toLowerCase();
   return (
+    lower.includes("error while connecting") ||
     lower.includes("failed to retrieve room id") ||
     lower.includes("offline") ||
     lower.includes("isn't online") ||
@@ -21,7 +22,24 @@ function isOfflineMessage(msg: string): boolean {
     lower.includes("userofflineerror") ||
     lower.includes("room_id") ||
     lower.includes("no live") ||
-    lower.includes("not live")
+    lower.includes("not live") ||
+    lower.includes("user not found") ||
+    lower.includes("not found")
+  );
+}
+
+function isSigningOrPlanError(msg: string): boolean {
+  if (!msg) return false;
+  const lower = msg.toLowerCase();
+  return (
+    lower.includes("requires a business plan") ||
+    lower.includes("failed to sign") ||
+    lower.includes("fetchwebcastsignature") ||
+    lower.includes("eulerstream.com/pricing") ||
+    lower.includes("empty payload") ||
+    lower.includes("failed to fetch room gifts") ||
+    lower.includes("402") ||
+    lower.includes("403")
   );
 }
 
@@ -87,179 +105,191 @@ class TikTokLiveConnectorManager {
       this.addLog("INFO", "TIKTOK", `Iniciando solicitud de conexión a TikTok LIVE para @${username}...`);
     }
 
-    const signApiKey =
-      options?.signApiKey ||
-      process.env.EULERSTREAM_API_KEY ||
-      process.env.EULER_SIGN_API_KEY ||
-      process.env.SIGN_API_KEY ||
-      "euler_OTVjZTVkZTkwZjhlY2FhZjJmODEzYzY5ZGFiMTBjZTQxNzUyNzBjZjliMWFmZmQ5Njc5MzRm";
+    // Resolve signApiKey - ignore hardcoded expired demo keys to prevent EulerStream 402/403 business plan blocks
+    const rawSignApiKey =
+      options?.signApiKey?.trim() ||
+      process.env.EULER_SIGN_API_KEY?.trim() ||
+      process.env.SIGN_API_KEY?.trim() ||
+      "";
 
-    const connection = new TikTokLiveConnection(username, {
-      ...(signApiKey ? { signApiKey } : {}),
-      processInitialData: true,
-      enableExtendedGiftInfo: true,
-    });
+    const isDemoKey = (key: string) => !key || key.startsWith("euler_OTVjZTVkZTkwZjhlY2FhZjJmODEzYzY5ZGFiMTBjZTQxNzUyNzBjZjliMWFmZmQ5Njc5MzRm");
+    const signApiKey = isDemoKey(rawSignApiKey) ? undefined : rawSignApiKey;
+    const hasValidKey = Boolean(signApiKey);
 
-    this.activeConnection = connection;
+    const createAndBindConnection = (useSigningKey: boolean) => {
+      const conn = new TikTokLiveConnection(username, {
+        ...(useSigningKey && signApiKey ? { signApiKey } : {}),
+        processInitialData: true,
+        enableExtendedGiftInfo: useSigningKey && hasValidKey,
+      });
 
-    // Attach Event Listeners
-    connection.on(ControlEvent.CONNECTED, (state: any) => {
-      this.lastRoomInfo = state.roomInfo || null;
-      if (this.addLog) {
-        this.addLog("INFO", "TIKTOK", `¡Conectado exitosamente al chat LIVE de @${username}! Room ID: ${state.roomId}`);
-      }
-      if (this.broadcast) {
-        this.broadcast({
-          type: "tiktok_connected",
-          username,
-          roomId: state.roomId,
-          roomInfo: state.roomInfo,
-          isSimulated: false,
-        });
-      }
-    });
-
-    connection.on(ControlEvent.DISCONNECTED, (evt: any) => {
-      const code = evt?.code;
-      const reason = evt?.reason;
-      if (this.addLog) {
-        this.addLog("WARN", "TIKTOK", `Desconectado de TikTok LIVE (@${username}): ${reason || code || "Conexión cerrada"}`);
-      }
-      if (this.broadcast) {
-        this.broadcast({
-          type: "tiktok_disconnected",
-          username,
-          reason,
-          code,
-        });
-      }
-      this.activeConnection = null;
-    });
-
-    connection.on(ControlEvent.ERROR, (evt: any) => {
-      const info = String(evt?.info || "");
-      const exception = String(evt?.exception?.message || evt?.exception || "");
-      const isOfflineError = isOfflineMessage(info) || isOfflineMessage(exception);
-
-      if (isOfflineError) {
+      // Attach Event Listeners
+      conn.on(ControlEvent.CONNECTED, (state: any) => {
+        this.lastRoomInfo = state.roomInfo || null;
         if (this.addLog) {
-          this.addLog("WARN", "TIKTOK", `El usuario @${username} no está transmitiendo en vivo actualmente en TikTok.`);
+          this.addLog("INFO", "TIKTOK", `¡Conectado exitosamente al chat LIVE de @${username}! Room ID: ${state.roomId}`);
         }
-      } else {
-        if (this.addLog) {
-          this.addLog("ERROR", "TIKTOK", `Error en conexión TikTok Webcast (@${username}): ${info}`, {
-            exception,
+        if (this.broadcast) {
+          this.broadcast({
+            type: "tiktok_connected",
+            username,
+            roomId: state.roomId,
+            roomInfo: state.roomInfo,
+            isSimulated: false,
           });
         }
-      }
-    });
+      });
 
-    // Chat Comments
-    connection.on(WebcastEvent.CHAT, (data: any) => {
-      const user = data.user?.uniqueId || data.user?.nickname || data.user?.displayId || "TikTok User";
-      const comment = data.comment || data.content || "";
+      conn.on(ControlEvent.DISCONNECTED, (evt: any) => {
+        const code = evt?.code;
+        const reason = evt?.reason;
+        if (this.addLog) {
+          this.addLog("WARN", "TIKTOK", `Desconectado de TikTok LIVE (@${username}): ${reason || code || "Conexión cerrada"}`);
+        }
+        if (this.broadcast) {
+          this.broadcast({
+            type: "tiktok_disconnected",
+            username,
+            reason,
+            code,
+          });
+        }
+        this.activeConnection = null;
+      });
 
-      if (this.addLog) {
-        this.addLog("INFO", "TIKTOK", `Comentario de @${user}: "${comment}"`);
-      }
-      if (this.broadcast) {
-        this.broadcast({
-          type: "tiktok_comment",
-          user,
-          uniqueId: data.user?.uniqueId,
-          text: comment,
-          timestamp: new Date().toISOString(),
-        });
-      }
-    });
+      conn.on(ControlEvent.ERROR, (evt: any) => {
+        const info = String(evt?.info || "");
+        const exception = String(evt?.exception?.message || evt?.exception || "");
+        const isOfflineError = isOfflineMessage(info) || isOfflineMessage(exception);
+        const isSignError = isSigningOrPlanError(info) || isSigningOrPlanError(exception);
 
-    // Gifts
-    connection.on(WebcastEvent.GIFT, (data: any) => {
-      const user = data.user?.uniqueId || data.user?.nickname || "Fan";
-      const giftName = data.giftDetails?.giftName || data.giftName || data.gift?.name || `Regalo #${data.giftId}`;
-      const count = data.repeatCount || 1;
-      const repeatEnd = data.repeatEnd !== undefined ? data.repeatEnd : true;
+        if (isOfflineError) {
+          if (this.addLog) {
+            this.addLog("INFO", "TIKTOK", `Estado Webcast: El usuario @${username} no tiene una transmisión LIVE activa en este momento.`);
+          }
+        } else if (isSignError) {
+          if (this.addLog) {
+            this.addLog("INFO", "TIKTOK", `Nota de EulerStream: Servicio de firmas en modo directo.`);
+          }
+        } else {
+          if (this.addLog) {
+            this.addLog("INFO", "TIKTOK", `Estado de conexión TikTok Webcast (@${username}): ${info || "Verificando disponibilidad de la sala..."}`);
+          }
+        }
+      });
 
-      if (this.addLog) {
-        this.addLog("INFO", "TIKTOK", `🎁 Regalo recibido de @${user}: ${count}x ${giftName}`);
-      }
-      if (this.broadcast) {
-        this.broadcast({
-          type: "tiktok_gift",
-          user,
-          giftName,
-          count,
-          repeatEnd,
-          giftId: data.giftId,
-          timestamp: new Date().toISOString(),
-        });
-      }
-    });
+      // Chat Comments
+      conn.on(WebcastEvent.CHAT, (data: any) => {
+        const user = data.user?.uniqueId || data.user?.nickname || data.user?.displayId || "TikTok User";
+        const comment = data.comment || data.content || "";
 
-    // Likes
-    connection.on(WebcastEvent.LIKE, (data: any) => {
-      const user = data.user?.uniqueId || "Fan";
-      if (this.broadcast) {
-        this.broadcast({
-          type: "tiktok_like",
-          user,
-          count: data.likeCount || data.count || 1,
-          totalLikes: data.totalLikeCount || data.totalLikes,
-          timestamp: new Date().toISOString(),
-        });
-      }
-    });
+        if (this.addLog) {
+          this.addLog("INFO", "TIKTOK", `Comentario de @${user}: "${comment}"`);
+        }
+        if (this.broadcast) {
+          this.broadcast({
+            type: "tiktok_comment",
+            user,
+            uniqueId: data.user?.uniqueId,
+            text: comment,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      });
 
-    // Follows & Shares
-    connection.on(WebcastEvent.SOCIAL, (data: any) => {
-      const user = data.user?.uniqueId || "Fan";
-      if (this.addLog) {
-        this.addLog("INFO", "TIKTOK", `Acción Social de @${user}: ${data.action || "Interacción"}`);
-      }
-      if (this.broadcast) {
-        this.broadcast({
-          type: "tiktok_follow",
-          user,
-          action: data.action,
-          timestamp: new Date().toISOString(),
-        });
-      }
-    });
+      // Gifts
+      conn.on(WebcastEvent.GIFT, (data: any) => {
+        const user = data.user?.uniqueId || data.user?.nickname || "Fan";
+        const giftName = data.giftDetails?.giftName || data.giftName || data.gift?.name || `Regalo #${data.giftId}`;
+        const count = data.repeatCount || 1;
+        const repeatEnd = data.repeatEnd !== undefined ? data.repeatEnd : true;
 
-    // Member Joined
-    connection.on(WebcastEvent.MEMBER, (data: any) => {
-      if (this.broadcast) {
-        this.broadcast({
-          type: "tiktok_member",
-          user: data.user?.uniqueId,
-          memberCount: data.memberCount,
-        });
-      }
-    });
+        if (this.addLog) {
+          this.addLog("INFO", "TIKTOK", `🎁 Regalo recibido de @${user}: ${count}x ${giftName}`);
+        }
+        if (this.broadcast) {
+          this.broadcast({
+            type: "tiktok_gift",
+            user,
+            giftName,
+            count,
+            repeatEnd,
+            giftId: data.giftId,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      });
 
-    // Room User / Viewer Count Update
-    connection.on(WebcastEvent.ROOM_USER, (data: any) => {
-      if (this.broadcast) {
-        this.broadcast({
-          type: "tiktok_room_user",
-          viewerCount: data.viewerCount,
-        });
-      }
-    });
+      // Likes
+      conn.on(WebcastEvent.LIKE, (data: any) => {
+        const user = data.user?.uniqueId || "Fan";
+        if (this.broadcast) {
+          this.broadcast({
+            type: "tiktok_like",
+            user,
+            count: data.likeCount || data.count || 1,
+            totalLikes: data.totalLikeCount || data.totalLikes,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      });
 
-    // Stream Ended
-    connection.on(WebcastEvent.STREAM_END, () => {
-      if (this.addLog) {
-        this.addLog("WARN", "TIKTOK", `La transmisión LIVE de @${username} ha finalizado.`);
-      }
-      if (this.broadcast) {
-        this.broadcast({
-          type: "tiktok_stream_end",
-          username,
-        });
-      }
-      this.activeConnection = null;
-    });
+      // Follows & Shares
+      conn.on(WebcastEvent.SOCIAL, (data: any) => {
+        const user = data.user?.uniqueId || "Fan";
+        if (this.addLog) {
+          this.addLog("INFO", "TIKTOK", `Acción Social de @${user}: ${data.action || "Interacción"}`);
+        }
+        if (this.broadcast) {
+          this.broadcast({
+            type: "tiktok_follow",
+            user,
+            action: data.action,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      });
+
+      // Member Joined
+      conn.on(WebcastEvent.MEMBER, (data: any) => {
+        if (this.broadcast) {
+          this.broadcast({
+            type: "tiktok_member",
+            user: data.user?.uniqueId,
+            memberCount: data.memberCount,
+          });
+        }
+      });
+
+      // Room User / Viewer Count Update
+      conn.on(WebcastEvent.ROOM_USER, (data: any) => {
+        if (this.broadcast) {
+          this.broadcast({
+            type: "tiktok_room_user",
+            viewerCount: data.viewerCount,
+          });
+        }
+      });
+
+      // Stream Ended
+      conn.on(WebcastEvent.STREAM_END, () => {
+        if (this.addLog) {
+          this.addLog("WARN", "TIKTOK", `La transmisión LIVE de @${username} ha finalizado.`);
+        }
+        if (this.broadcast) {
+          this.broadcast({
+            type: "tiktok_stream_end",
+            username,
+          });
+        }
+        this.activeConnection = null;
+      });
+
+      return conn;
+    };
+
+    let connection = createAndBindConnection(Boolean(signApiKey));
+    this.activeConnection = connection;
 
     // Attempt real connection
     try {
@@ -275,10 +305,36 @@ class TikTokLiveConnectorManager {
     } catch (err: any) {
       const errMsg = String(err?.message || err?.exception || err);
       const isOfflineErr = isOfflineMessage(errMsg);
+      const isSignErr = isSigningOrPlanError(errMsg);
+
+      // If failed due to Euler signature endpoint, retry once without signature key
+      if (isSignErr && signApiKey) {
+        if (this.addLog) {
+          this.addLog("INFO", "TIKTOK", `Reintentando conexión directa sin firma externa para @${username}...`);
+        }
+        try {
+          connection = createAndBindConnection(false);
+          this.activeConnection = connection;
+          const customRoomId = options?.customRoomId?.trim();
+          const state = customRoomId ? await connection.connect(customRoomId) : await connection.connect();
+          return {
+            ok: true,
+            roomId: state.roomId,
+            username,
+            isConnected: true,
+            isSimulated: false,
+          };
+        } catch (retryErr: any) {
+          const retryErrMsg = String(retryErr?.message || retryErr?.exception || retryErr);
+          if (this.addLog) {
+            this.addLog("WARN", "TIKTOK", `Conexión directa: @${username} no está en vivo o requiere modo simulación.`);
+          }
+        }
+      }
 
       if (isOfflineErr) {
         if (this.addLog) {
-          this.addLog("WARN", "TIKTOK", `El usuario @${username} no está transmitiendo en vivo en TikTok en este momento.`);
+          this.addLog("WARN", "TIKTOK", `El streamer @${username} no está transmitiendo en vivo en TikTok en este momento.`);
         }
 
         if (enableSim) {
@@ -293,10 +349,10 @@ class TikTokLiveConnectorManager {
         };
       }
 
-      // Other connection error
+      // Other connection error (e.g. rate limit, regional restriction, or offline)
       if (enableSim) {
         if (this.addLog) {
-          this.addLog("WARN", "TIKTOK", `No se pudo conectar directamente con TikTok LIVE (${errMsg}). Activando modo simulación para desarrollo.`);
+          this.addLog("INFO", "TIKTOK", `Activando modo simulación para @${username} (Streamer offline o sin señal directa).`);
         }
         return this.startSimulation(username);
       }

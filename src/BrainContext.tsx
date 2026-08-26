@@ -1,7 +1,28 @@
 import { createContext, useState, useEffect, ReactNode, useRef } from "react";
-import { BrainContextType, Emotion, AvatarAnimationClass, ObsStatus, ChatMessage, LogEntry, LogLevel, LogScope } from "./types";
+import {
+  BrainContextType,
+  Emotion,
+  AvatarAnimationClass,
+  ObsStatus,
+  ChatMessage,
+  LogEntry,
+  LogLevel,
+  LogScope,
+  GeminiVoiceName,
+  TtsExpressiveness,
+  TtsVoiceSettings,
+} from "./types";
 import { useGeminiTtsEmotion } from "./hooks/useGeminiTtsEmotion";
 import { useGameState } from "./hooks/useGameState";
+import { useWebSocketReconnection } from "./hooks/useWebSocketReconnection";
+
+export const DEFAULT_TTS_VOICE_SETTINGS: TtsVoiceSettings = {
+  voice: "Kore",
+  speakingRate: 1.05,
+  pitch: 1.1,
+  expressiveness: "cheerful",
+  autoSpeechEnabled: true,
+};
 
 export const BrainContext = createContext<BrainContextType>({} as BrainContextType);
 
@@ -30,6 +51,38 @@ export function BrainProvider({ children }: { children: ReactNode }) {
   // LOD & FPS state for 3D optimization
   const [lodLevel, setLodLevel] = useState<"HIGH" | "MEDIUM" | "LOW">("HIGH");
   const [fps, setFps] = useState<number>(60);
+
+  // Gemini TTS Voice Profiles & Fine-Tuning State with LocalStorage Persistence
+  const [ttsVoiceSettings, setTtsVoiceSettings] = useState<TtsVoiceSettings>(() => {
+    try {
+      const saved = localStorage.getItem("hectron_tts_voice_settings");
+      if (saved) {
+        return { ...DEFAULT_TTS_VOICE_SETTINGS, ...JSON.parse(saved) };
+      }
+    } catch {
+      // Fallback
+    }
+    return DEFAULT_TTS_VOICE_SETTINGS;
+  });
+
+  const updateTtsVoiceSettings = (partial: Partial<TtsVoiceSettings>) => {
+    setTtsVoiceSettings((prev) => {
+      const updated = { ...prev, ...partial };
+      try {
+        localStorage.setItem("hectron_tts_voice_settings", JSON.stringify(updated));
+      } catch (err) {
+        console.warn("Error saving TTS settings to localStorage", err);
+      }
+      return updated;
+    });
+  };
+
+  const resetTtsVoiceSettings = () => {
+    setTtsVoiceSettings(DEFAULT_TTS_VOICE_SETTINGS);
+    try {
+      localStorage.setItem("hectron_tts_voice_settings", JSON.stringify(DEFAULT_TTS_VOICE_SETTINGS));
+    } catch {}
+  };
 
   // Structured Log Buffer
   const [logs, setLogs] = useState<LogEntry[]>([
@@ -198,246 +251,182 @@ export function BrainProvider({ children }: { children: ReactNode }) {
   }, [tiktokConnected]);
 
   // Real-time server state sync over WebSocket (with automatic background reconnection)
-  useEffect(() => {
-    let ws: WebSocket | null = null;
-    let reconnectTimeoutId: any = null;
-    let isMounted = true;
-    let reconnectAttempts = 0;
-
-    const attemptTiktokReconnection = async () => {
-      const savedCode = localStorage.getItem("hectron_tiktok_code");
-      if (!savedCode) {
+  const attemptTiktokReconnection = async () => {
+    const savedCode = localStorage.getItem("hectron_tiktok_code");
+    if (!savedCode) {
+      setTiktokConnected(true);
+      return;
+    }
+    localStorage.removeItem("hectron_tiktok_code"); // One-time code used, clear immediately
+    addLog("INFO", "TIKTOK", "Verificando sesión activa de TikTok LIVE con el servidor...");
+    try {
+      const res = await fetch("/api/tiktok/init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: savedCode }),
+      });
+      if (res.ok) {
         setTiktokConnected(true);
-        return;
-      }
-      localStorage.removeItem("hectron_tiktok_code"); // One-time code used, clear immediately
-
-      addLog("INFO", "TIKTOK", "Verificando sesión activa de TikTok LIVE con el servidor...");
-      try {
-        const res = await fetch("/api/tiktok/init", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code: savedCode }),
-        });
-        if (res.ok) {
-          setTiktokConnected(true);
-          addLog("INFO", "TIKTOK", "¡Sesión de TikTok LIVE vinculada activamente!");
-        } else {
-          setTiktokConnected(true);
-          addLog("INFO", "TIKTOK", "Sesión de TikTok LIVE activa mantenida en el servidor.");
-        }
-      } catch (err: any) {
+        addLog("INFO", "TIKTOK", "¡Sesión de TikTok LIVE vinculada activamente!");
+      } else {
         setTiktokConnected(true);
-        addLog("INFO", "TIKTOK", "Sesión de TikTok LIVE lista en modo activo.");
+        addLog("INFO", "TIKTOK", "Sesión de TikTok LIVE activa mantenida en el servidor.");
       }
-    };
+    } catch (err: any) {
+      setTiktokConnected(true);
+    }
+  };
 
-    let isConnecting = false;
+  const protocol = typeof window !== 'undefined' && window.location.protocol === "https:" ? "wss:" : "ws:";
+  const host = typeof window !== 'undefined' ? window.location.host : "localhost";
+  const wsUrl = `${protocol}//${host}/api/brain/ws`;
 
-    const connectWebSocket = () => {
-      if (!isMounted || isConnecting) return;
-      isConnecting = true;
-
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const host = window.location.host;
-      const wsUrl = `${protocol}//${host}/api/brain/ws`;
-
-      addLog("DEBUG", "FRONTEND", `Estableciendo WebSocket con el servidor en ${wsUrl}...`);
-
+  useWebSocketReconnection({
+    url: wsUrl,
+    onOpen: (event) => {
+      addLog("INFO", "FRONTEND", "Conexión WebSocket en vivo establecida con el servidor de HECTRON");
+      // If we had an active TikTok session, check if we need to restore/reconnect the TikTok stream
+      if (wasTiktokActiveRef.current) {
+        // Give a tiny delay for state to sync first
+        setTimeout(() => {
+          if (!wasTiktokActiveRef.current) {
+            // If after syncing, tiktokConnected is still false, trigger auto-reconnect
+            attemptTiktokReconnection();
+          }
+        }, 1000);
+      }
+    },
+    onMessage: (event) => {
       try {
-        if (ws) {
-          try { ws.close(); } catch (e) {}
+        const data = JSON.parse(event.data);
+        if (data.type === "state") {
+          setTiktokConnected(data.tiktokConnected || false);
+          setObsStatus({
+            connected: data.obsConnected !== undefined ? data.obsConnected : Boolean(data.currentScene),
+            streaming: data.isStreaming || false,
+            scene: data.currentScene || "DEFAULT",
+          });
+          if (data.currentEmotion) {
+            setEmotion(data.currentEmotion);
+          }
+          if (data.isAutonomous !== undefined) {
+            setIsAutonomous(data.isAutonomous);
+          }
+        } else if (data.type === "tiktok_connected") {
+          setTiktokConnected(true);
+          addLog("INFO", "TIKTOK", `Sesión de TikTok LIVE vinculada. ID de Sala: ${data.roomId || "Desconocido"}`);
+        } else if (data.type === "tiktok_disconnected") {
+          setTiktokConnected(false);
+          addLog("WARN", "TIKTOK", "Sesión de TikTok LIVE desconectada");
+        } else if (data.type === "tiktok_comment") {
+          addMessage({
+            sender: data.user || "TikTok User",
+            text: data.text || "",
+            isAi: false,
+          });
+        } else if (data.type === "tiktok_gift") {
+          const giftName = data.giftName || "Rosa";
+          addMessage({
+            sender: `Regalo: ${data.user}`,
+            text: `¡Envió ${data.count}x ${giftName}! 🎁`,
+            isAi: false,
+          });
+          addLog("INFO", "TIKTOK", `Regalo recibido: ${data.count}x ${giftName} de ${data.user}`);
+          // Trigger Miku's reactive avatar & OBS scene switch
+          let targetEmotion: Emotion = "HAPPY";
+          let targetScene = "HAPPY_SCENE";
+          let voiceResponse = `¡Muchas gracias por ese genial regalo de ${giftName}!`;
+          const normalized = giftName.toLowerCase();
+          if (normalized.includes("rosa") || normalized.includes("rose")) {
+            targetEmotion = "FLIRT";
+            targetScene = "FLIRT_SCENE";
+            voiceResponse = `¡Oh, una rosa! Qué romántico, muchísimas gracias por este hermoso detalle de ${data.user}.`;
+          } else if (normalized.includes("corona") || normalized.includes("crown")) {
+            targetEmotion = "SURPRISE";
+            targetScene = "SURPRISE_SCENE";
+            voiceResponse = `¡Guao! ¡Una corona majestuosa de ${data.user}! ¡No lo puedo creer, me siento como una reina!`;
+          } else if (normalized.includes("pesa") || normalized.includes("dumbbell")) {
+            targetEmotion = "HAPPY";
+            targetScene = "HAPPY_SCENE";
+            voiceResponse = `¡Muchas gracias por la pesa ${data.user}, a entrenar fuerte hoy!`;
+          } else if (normalized.includes("picante") || normalized.includes("chili")) {
+            targetEmotion = "ANGRY";
+            targetScene = "ANGRY_SCENE";
+            voiceResponse = `¡Ay ay ay, eso pica demasiado ${data.user}! Qué travieso eres.`;
+          } else if (normalized.includes("llanto") || normalized.includes("cry")) {
+            targetEmotion = "SAD";
+            targetScene = "SAD_SCENE";
+            voiceResponse = `Oh ${data.user}, no estés triste. Muchas gracias por tu tierno apoyo.`;
+          }
+          // Reward player with in-game items & coins on TikTok Gift!
+          if (normalized.includes("rosa") || normalized.includes("rose")) {
+            collectItem("cyber_rose", data.count || 1);
+          } else if (normalized.includes("corona") || normalized.includes("crown")) {
+            collectItem("streamer_crown", 1);
+            gainCoins(500);
+          } else {
+            gainCoins((data.count || 1) * 20);
+            gainExperience((data.count || 1) * 15);
+          }
+          setEmotion(targetEmotion);
+          setObsStatus((prev) => ({ ...prev, scene: targetScene }));
+          speakText(voiceResponse, targetEmotion).catch(err => console.warn("TTS error:", err));
+        } else if (data.type === "tiktok_follow") {
+          addMessage({
+            sender: `Seguidor: ${data.user}`,
+            text: "¡Te ha comenzado a seguir! 💖",
+            isAi: false,
+          });
+          addLog("INFO", "TIKTOK", `Nuevo seguidor en directo: ${data.user}`);
+          gainCoins(50);
+          gainExperience(25);
+        } else if (data.type === "log" && data.entry) {
+          const entry = data.entry;
+          if (entry.scope !== "FRONTEND") {
+            setLogs((prev) => {
+              if (prev.some((l) => l.id === entry.id)) return prev;
+              return [...prev.slice(-300), {
+                id: entry.id,
+                timestamp: entry.timestamp,
+                level: entry.level,
+                scope: entry.scope,
+                message: entry.message,
+                details: entry.details,
+              }];
+            });
+          }
         }
-        
-        ws = new WebSocket(wsUrl);
-
-        // Connection Timeout handler
-        const connectionTimeout = setTimeout(() => {
-          if (ws && ws.readyState !== WebSocket.OPEN) {
-             addLog("WARN", "FRONTEND", "Tiempo de espera de conexión WebSocket excedido (timeout).");
-             ws.close(); // This will trigger onclose which schedules reconnect
-          }
-        }, 10000); // 10 second connection timeout
-
-        ws.onopen = () => {
-          clearTimeout(connectionTimeout);
-          isConnecting = false;
-          if (!isMounted) return;
-          const wasFirstConnect = reconnectAttempts === 0;
-          reconnectAttempts = 0;
-          addLog("INFO", "FRONTEND", "Conexión WebSocket en vivo establecida con el servidor de HECTRON");
-
-          // If we had an active TikTok session, and this is a reconnection (not the first mount),
-          // check if we need to restore/reconnect the TikTok stream
-          if (!wasFirstConnect && wasTiktokActiveRef.current) {
-            // Give a tiny delay for state to sync first
-            setTimeout(() => {
-              if (isMounted && !wasTiktokActiveRef.current) {
-                // If after syncing, tiktokConnected is still false, trigger auto-reconnect
-                attemptTiktokReconnection();
-              }
-            }, 1000);
-          }
-        };
-
-        ws.onmessage = (event) => {
-          if (!isMounted) return;
-          try {
-            const data = JSON.parse(event.data);
-            if (data.type === "state") {
-              setTiktokConnected(data.tiktokConnected || false);
-              setObsStatus({
-                connected: data.obsConnected !== undefined ? data.obsConnected : Boolean(data.currentScene),
-                streaming: data.isStreaming || false,
-                scene: data.currentScene || "DEFAULT",
-              });
-              if (data.currentEmotion) {
-                setEmotion(data.currentEmotion);
-              }
-              if (data.isAutonomous !== undefined) {
-                setIsAutonomous(data.isAutonomous);
-              }
-            } else if (data.type === "tiktok_connected") {
-              setTiktokConnected(true);
-              addLog("INFO", "TIKTOK", `Sesión de TikTok LIVE vinculada. ID de Sala: ${data.roomId || "Desconocido"}`);
-            } else if (data.type === "tiktok_disconnected") {
-              setTiktokConnected(false);
-              addLog("WARN", "TIKTOK", "Sesión de TikTok LIVE desconectada");
-            } else if (data.type === "tiktok_comment") {
-              addMessage({
-                sender: data.user || "TikTok User",
-                text: data.text || "",
-                isAi: false,
-              });
-            } else if (data.type === "tiktok_gift") {
-              const giftName = data.giftName || "Rosa";
-              addMessage({
-                sender: `Regalo: ${data.user}`,
-                text: `¡Envió ${data.count}x ${giftName}! 🎁`,
-                isAi: false,
-              });
-              addLog("INFO", "TIKTOK", `Regalo recibido: ${data.count}x ${giftName} de ${data.user}`);
-
-              // Trigger Miku's reactive avatar & OBS scene switch
-              let targetEmotion: Emotion = "HAPPY";
-              let targetScene = "HAPPY_SCENE";
-              let voiceResponse = `¡Muchas gracias por ese genial regalo de ${giftName}!`;
-
-              const normalized = giftName.toLowerCase();
-              if (normalized.includes("rosa") || normalized.includes("rose")) {
-                targetEmotion = "FLIRT";
-                targetScene = "FLIRT_SCENE";
-                voiceResponse = `¡Oh, una rosa! Qué romántico, muchísimas gracias por este hermoso detalle de ${data.user}.`;
-              } else if (normalized.includes("corona") || normalized.includes("crown")) {
-                targetEmotion = "SURPRISE";
-                targetScene = "SURPRISE_SCENE";
-                voiceResponse = `¡Guao! ¡Una corona majestuosa de ${data.user}! ¡No lo puedo creer, me siento como una reina!`;
-              } else if (normalized.includes("pesa") || normalized.includes("dumbbell")) {
-                targetEmotion = "HAPPY";
-                targetScene = "HAPPY_SCENE";
-                voiceResponse = `¡Muchas gracias por la pesa ${data.user}, a entrenar fuerte hoy!`;
-              } else if (normalized.includes("picante") || normalized.includes("chili")) {
-                targetEmotion = "ANGRY";
-                targetScene = "ANGRY_SCENE";
-                voiceResponse = `¡Ay ay ay, eso pica demasiado ${data.user}! Qué travieso eres.`;
-              } else if (normalized.includes("llanto") || normalized.includes("cry")) {
-                targetEmotion = "SAD";
-                targetScene = "SAD_SCENE";
-                voiceResponse = `Oh ${data.user}, no estés triste. Muchas gracias por tu tierno apoyo.`;
-              }
-
-              // Reward player with in-game items & coins on TikTok Gift!
-              if (normalized.includes("rosa") || normalized.includes("rose")) {
-                collectItem("cyber_rose", data.count || 1);
-              } else if (normalized.includes("corona") || normalized.includes("crown")) {
-                collectItem("streamer_crown", 1);
-                gainCoins(500);
-              } else {
-                gainCoins((data.count || 1) * 20);
-                gainExperience((data.count || 1) * 15);
-              }
-
-              setEmotion(targetEmotion);
-              setObsStatus((prev) => ({ ...prev, scene: targetScene }));
-              speakText(voiceResponse, targetEmotion).catch(err => console.warn("TTS error:", err));
-            } else if (data.type === "tiktok_follow") {
-              addMessage({
-                sender: `Seguidor: ${data.user}`,
-                text: "¡Te ha comenzado a seguir! 💖",
-                isAi: false,
-              });
-              addLog("INFO", "TIKTOK", `Nuevo seguidor en directo: ${data.user}`);
-              gainCoins(50);
-              gainExperience(25);
-            } else if (data.type === "log" && data.entry) {
-              const entry = data.entry;
-              if (entry.scope !== "FRONTEND") {
-                setLogs((prev) => {
-                  if (prev.some((l) => l.id === entry.id)) return prev;
-                  return [...prev.slice(-300), {
-                    id: entry.id,
-                    timestamp: entry.timestamp,
-                    level: entry.level,
-                    scope: entry.scope,
-                    message: entry.message,
-                    details: entry.details,
-                  }];
-                });
-              }
-            }
-          } catch (err) {
-            console.error("Error parsing WebSocket message:", err);
-          }
-        };
-
-        ws.onclose = (event) => {
-          isConnecting = false;
-          if (!isMounted) return;
-          addLog("WARN", "FRONTEND", `Conexión perdida con el servidor de HECTRON (Código: ${event.code}). Intentando reconectar en segundo plano...`);
-          scheduleReconnect();
-        };
-
-        ws.onerror = (error) => {
-          isConnecting = false;
-          if (!isMounted) return;
-          // Log gracefully to avoid throwing uncaught console.error during server restarts or transient disconnects
-          console.log("WebSocket connecting/reconnecting status...");
-        };
-      } catch (err: any) {
-        isConnecting = false;
-        addLog("ERROR", "FRONTEND", `Error al inicializar WebSocket: ${err?.message || String(err)}`);
-        scheduleReconnect();
+      } catch (err) {
+        console.error("Error parsing WebSocket message:", err);
       }
-    };
-
-    const scheduleReconnect = () => {
-      if (!isMounted) return;
-      if (reconnectTimeoutId) clearTimeout(reconnectTimeoutId);
-      
-      // Exponential backoff up to 10 seconds
-      const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
-      reconnectAttempts++;
-      
-      reconnectTimeoutId = setTimeout(() => {
-        connectWebSocket();
-      }, delay);
-    };
-
-    connectWebSocket();
-
-    return () => {
-      isMounted = false;
-      if (ws) {
-        try {
-          ws.close();
-        } catch {}
-      }
-      if (reconnectTimeoutId) clearTimeout(reconnectTimeoutId);
-    };
-  }, []);
+    },
+    onClose: (event) => {
+      addLog("WARN", "FRONTEND", `Conexión perdida con el servidor de HECTRON (Código: ${event.code}). Intentando reconectar en segundo plano...`);
+    },
+    onError: (error) => {
+      // Log gracefully to avoid throwing uncaught console.error
+      console.log("WebSocket connecting/reconnecting status...");
+    }
+  });
 
   // Audio / Speech Synthesizer Function
-  const speakText = async (text: string, currentEmotion?: Emotion, customAnimation?: AvatarAnimationClass) => {
+  const speakText = async (
+    text: string,
+    currentEmotion?: Emotion,
+    customAnimation?: AvatarAnimationClass,
+    customVoiceConfig?: Partial<TtsVoiceSettings>
+  ) => {
+    const activeConfig: TtsVoiceSettings = {
+      ...ttsVoiceSettings,
+      ...customVoiceConfig,
+    };
+
+    // If autoSpeech is disabled and this wasn't explicitly triggered with a custom override or test
+    if (!activeConfig.autoSpeechEnabled && !customVoiceConfig) {
+      addLog("INFO", "FRONTEND", `Speech synthesis skipped (autoSpeech is turned off): "${text.substring(0, 30)}..."`);
+      return;
+    }
+
     setIsSpeaking(true);
     setLatestSpeechText(text);
 
@@ -447,7 +436,11 @@ export function BrainProvider({ children }: { children: ReactNode }) {
       setAnimationClass(customAnimation);
     }
     
-    addLog("INFO", "FRONTEND", `Triggering Gemini TTS synthesis [${ttsMeta.animationClass.toUpperCase()}]: "${text.substring(0, 30)}..."`, {
+    addLog("INFO", "FRONTEND", `Triggering Gemini TTS synthesis [${activeConfig.voice} | ${ttsMeta.animationClass.toUpperCase()}]: "${text.substring(0, 30)}..."`, {
+      voice: activeConfig.voice,
+      speakingRate: activeConfig.speakingRate,
+      pitch: activeConfig.pitch,
+      expressiveness: activeConfig.expressiveness,
       sentimentScore: ttsMeta.sentimentScore,
       emotion: ttsMeta.emotion,
       animationClass: ttsMeta.animationClass,
@@ -457,7 +450,13 @@ export function BrainProvider({ children }: { children: ReactNode }) {
       const res = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice: "Kore" }),
+        body: JSON.stringify({
+          text,
+          voice: activeConfig.voice,
+          expressiveness: activeConfig.expressiveness,
+          speakingRate: activeConfig.speakingRate,
+          pitch: activeConfig.pitch,
+        }),
       });
 
       if (res.ok) {
@@ -493,7 +492,7 @@ export function BrainProvider({ children }: { children: ReactNode }) {
                 channelData[i] = intSample / 32768.0;
               }
               
-              addLog("INFO", "FRONTEND", `Successfully parsed raw PCM audio (${sampleRate}Hz)`);
+              addLog("INFO", "FRONTEND", `Successfully parsed raw PCM audio (${sampleRate}Hz, Voice: ${activeConfig.voice})`);
             } else {
               decodedBuffer = await audioContext.decodeAudioData(bytes.buffer);
               addLog("INFO", "FRONTEND", "Successfully decoded fallback encoded audio format");
@@ -501,6 +500,10 @@ export function BrainProvider({ children }: { children: ReactNode }) {
 
             const source = audioContext.createBufferSource();
             source.buffer = decodedBuffer;
+            // Apply speaking rate & pitch modulation to PCM buffer source
+            if (activeConfig.speakingRate && activeConfig.speakingRate > 0) {
+              source.playbackRate.value = Math.max(0.5, Math.min(2.0, activeConfig.speakingRate));
+            }
             source.connect(audioContext.destination);
             source.onended = () => setIsSpeaking(false);
             source.start(0);
@@ -523,8 +526,12 @@ export function BrainProvider({ children }: { children: ReactNode }) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = "es-ES";
-      utterance.pitch = ttsMeta.pitch || 1.35; // Dynamic pitch based on sentiment
-      utterance.rate = ttsMeta.speed || 1.05;
+      // Fine-tuned pitch and rate calculation
+      const basePitch = ttsMeta.pitch || 1.1;
+      utterance.pitch = Math.max(0.5, Math.min(2.0, basePitch * activeConfig.pitch));
+      const baseSpeed = ttsMeta.speed || 1.0;
+      utterance.rate = Math.max(0.5, Math.min(2.0, baseSpeed * activeConfig.speakingRate));
+      
       utterance.onend = () => setIsSpeaking(false);
       utterance.onerror = () => setIsSpeaking(false);
       window.speechSynthesis.speak(utterance);
@@ -566,6 +573,10 @@ export function BrainProvider({ children }: { children: ReactNode }) {
         lodLevel,
         setLodLevel,
         fps,
+        ttsVoiceSettings,
+        setTtsVoiceSettings,
+        updateTtsVoiceSettings,
+        resetTtsVoiceSettings,
         gameState,
         collectItem,
         useItem,

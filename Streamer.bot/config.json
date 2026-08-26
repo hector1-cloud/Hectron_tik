@@ -1,0 +1,51 @@
+{
+  "name": "HECTRON Streamer.bot Integration Configuration",
+  "version": "2.4.0",
+  "websocketServer": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 8080,
+    "endpoint": "/",
+    "autoStart": true,
+    "ssl": false
+  },
+  "obsWebSocket": {
+    "enabled": true,
+    "version": "v5",
+    "host": "127.0.0.1",
+    "port": 4455,
+    "password": ""
+  },
+  "hectronBridge": {
+    "serverUrl": "http://127.0.0.1:3000",
+    "wsUrl": "ws://127.0.0.1:3000/api/brain/ws",
+    "heartbeatIntervalMs": 5000,
+    "reconnectAttempts": 20
+  },
+  "actions": [
+    {
+      "name": "Hectron_TikTok_Gift",
+      "group": "HECTRON_INTEGRATIONS",
+      "enabled": true,
+      "csharpFile": "actions/TikTokGiftAction.cs"
+    },
+    {
+      "name": "Hectron_TikTok_Chat",
+      "group": "HECTRON_INTEGRATIONS",
+      "enabled": true,
+      "csharpFile": "actions/TikTokCommentAction.cs"
+    },
+    {
+      "name": "Hectron_TikTok_Follow",
+      "group": "HECTRON_INTEGRATIONS",
+      "enabled": true,
+      "csharpFile": "actions/TikTokFollowAction.cs"
+    },
+    {
+      "name": "Hectron_SendChatbotMessage",
+      "group": "HECTRON_INTEGRATIONS",
+      "enabled": true,
+      "csharpFile": "actions/ChatbotResponseAction.cs"
+    }
+  ]
+}

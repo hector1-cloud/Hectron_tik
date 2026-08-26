@@ -1,0 +1,58 @@
+{
+  "version": "0.2.4",
+  "name": "HECTRON_Streamer_Bot_Package",
+  "actions": [
+    {
+      "id": "hectron-action-gift",
+      "name": "Hectron_TikTok_Gift",
+      "group": "HECTRON",
+      "enabled": true,
+      "subactions": [
+        {
+          "type": "csharp_code",
+          "file": "TikTokGiftAction.cs",
+          "description": "Handle TikTok gifts, switch OBS scenes and broadcast to overlay"
+        }
+      ]
+    },
+    {
+      "id": "hectron-action-chat",
+      "name": "Hectron_TikTok_Chat",
+      "group": "HECTRON",
+      "enabled": true,
+      "subactions": [
+        {
+          "type": "csharp_code",
+          "file": "TikTokCommentAction.cs",
+          "description": "Process TikTok chat messages and AI prompts"
+        }
+      ]
+    },
+    {
+      "id": "hectron-action-follow",
+      "name": "Hectron_TikTok_Follow",
+      "group": "HECTRON",
+      "enabled": true,
+      "subactions": [
+        {
+          "type": "csharp_code",
+          "file": "TikTokFollowAction.cs",
+          "description": "Alert on new followers, award in-game coins and trigger OBS source"
+        }
+      ]
+    },
+    {
+      "id": "hectron-action-chatbot",
+      "name": "Hectron_SendChatbotMessage",
+      "group": "HECTRON",
+      "enabled": true,
+      "subactions": [
+        {
+          "type": "csharp_code",
+          "file": "ChatbotResponseAction.cs",
+          "description": "Broadcast chatbot message to HECTRON overlay"
+        }
+      ]
+    }
+  ]
+}
