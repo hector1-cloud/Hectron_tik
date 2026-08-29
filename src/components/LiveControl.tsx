@@ -13,6 +13,7 @@ import {
   Save,
   Coins,
   Sparkles,
+  Mic,
 } from "lucide-react";
 
 export function LiveControl() {
@@ -142,6 +143,15 @@ export function LiveControl() {
           <Square className="w-5 h-5 fill-current" />
           <span>DETENER TRANSMISIÓN</span>
         </button>
+      </div>
+
+      {/* Voice Recognition Quick Cue */}
+      <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-slate-950/90 border border-slate-800 text-[11px]">
+        <span className="flex items-center gap-1.5 text-slate-400">
+          <Mic className="w-3.5 h-3.5 text-rose-400" />
+          Comandos de voz: <span className="text-cyan-300 font-mono">"Iniciar transmisión"</span> / <span className="text-rose-300 font-mono">"Detener transmisión"</span>
+        </span>
+        <span className="text-[10px] text-slate-500 hidden sm:inline">Manos libres</span>
       </div>
 
       {/* Metrics Grid */}

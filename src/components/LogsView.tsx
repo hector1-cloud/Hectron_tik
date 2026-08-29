@@ -1,21 +1,94 @@
-import { useState, useContext } from "react";
+import { useState, useContext, useMemo } from "react";
 import { BrainContext } from "../BrainContext";
 import { LogLevel, LogScope } from "../types";
-import { Terminal, Shield, RefreshCw, Trash2, Copy, Filter, AlertTriangle, CheckCircle2, Info, Bug } from "lucide-react";
+import {
+  Terminal,
+  Shield,
+  RefreshCw,
+  Trash2,
+  Copy,
+  Filter,
+  AlertTriangle,
+  CheckCircle2,
+  Info,
+  Bug,
+  AlertOctagon,
+  Sparkles,
+  Music2,
+  Server,
+  Layers,
+  Search,
+  X,
+  Radio,
+} from "lucide-react";
+
+export type PriorityFilter = "ALL" | "INFO" | "WARN" | "ERROR" | "DEBUG";
+export type SourceFilter = "ALL" | "TIKTOK" | "AI" | "SYSTEM";
 
 export function LogsView() {
   const { logs, clearLogs, addLog } = useContext(BrainContext);
-  const [selectedLevel, setSelectedLevel] = useState<string>("ALL");
-  const [selectedScope, setSelectedScope] = useState<string>("ALL");
+  const [selectedLevel, setSelectedLevel] = useState<PriorityFilter>("ALL");
+  const [selectedSource, setSelectedSource] = useState<SourceFilter>("ALL");
   const [search, setSearch] = useState<string>("");
   const [copied, setCopied] = useState<boolean>(false);
 
-  const filteredLogs = logs.filter((log) => {
-    if (selectedLevel !== "ALL" && log.level !== selectedLevel) return false;
-    if (selectedScope !== "ALL" && log.scope !== selectedScope) return false;
-    if (search && !log.message.toLowerCase().includes(search.toLowerCase())) return false;
+  // Helper to categorize log source into TIKTOK, AI, or SYSTEM
+  const matchSource = (log: { scope: LogScope; message: string }, filter: SourceFilter): boolean => {
+    if (filter === "ALL") return true;
+    if (filter === "TIKTOK") {
+      return log.scope === "TIKTOK" || log.message.toLowerCase().includes("tiktok");
+    }
+    if (filter === "AI") {
+      return (
+        log.scope === "AGENT" ||
+        (log.scope as any) === "AI" ||
+        log.message.toLowerCase().includes("ai") ||
+        log.message.toLowerCase().includes("gemini") ||
+        log.message.toLowerCase().includes("brain") ||
+        log.message.toLowerCase().includes("tts") ||
+        log.message.toLowerCase().includes("miku")
+      );
+    }
+    if (filter === "SYSTEM") {
+      return (
+        log.scope === "SERVER" ||
+        log.scope === "FRONTEND" ||
+        log.scope === "WORKFLOW" ||
+        log.scope === "3D" ||
+        (log.scope as any) === "SYSTEM"
+      );
+    }
     return true;
-  });
+  };
+
+  // Compute counts for toggle badges
+  const counts = useMemo(() => {
+    return {
+      all: logs.length,
+      info: logs.filter((l) => l.level === "INFO").length,
+      warn: logs.filter((l) => l.level === "WARN").length,
+      error: logs.filter((l) => l.level === "ERROR").length,
+      debug: logs.filter((l) => l.level === "DEBUG").length,
+      tiktok: logs.filter((l) => matchSource(l, "TIKTOK")).length,
+      ai: logs.filter((l) => matchSource(l, "AI")).length,
+      system: logs.filter((l) => matchSource(l, "SYSTEM")).length,
+    };
+  }, [logs]);
+
+  const filteredLogs = useMemo(() => {
+    return logs.filter((log) => {
+      if (selectedLevel !== "ALL" && log.level !== selectedLevel) return false;
+      if (!matchSource(log, selectedSource)) return false;
+      if (search) {
+        const query = search.toLowerCase();
+        const msgMatch = log.message.toLowerCase().includes(query);
+        const scopeMatch = log.scope.toLowerCase().includes(query);
+        const levelMatch = log.level.toLowerCase().includes(query);
+        if (!msgMatch && !scopeMatch && !levelMatch) return false;
+      }
+      return true;
+    });
+  }, [logs, selectedLevel, selectedSource, search]);
 
   const handleCopy = () => {
     const text = filteredLogs
@@ -31,7 +104,7 @@ export function LogsView() {
       case "ERROR":
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-rose-500/20 text-rose-400 border border-rose-500/30">
-            <AlertTriangle className="w-3 h-3" /> ERROR
+            <AlertOctagon className="w-3 h-3" /> ERROR
           </span>
         );
       case "WARN":
@@ -65,7 +138,7 @@ export function LogsView() {
       WORKFLOW: "bg-orange-950/80 text-orange-300 border-orange-800",
     };
     return (
-      <span className={`px-2 py-0.5 rounded text-[10px] font-mono border ${colors[scope] || 'bg-slate-800 text-slate-300'}`}>
+      <span className={`px-2 py-0.5 rounded text-[10px] font-mono border ${colors[scope] || "bg-slate-800 text-slate-300"}`}>
         {scope}
       </span>
     );
@@ -81,85 +154,230 @@ export function LogsView() {
           </div>
           <div>
             <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
-              System Telemetry & Event Log
+              Telemetría & Registro de Eventos
               <span className="text-xs font-normal text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
-                {filteredLogs.length} entries
+                {filteredLogs.length} / {logs.length} eventos
               </span>
             </h2>
             <p className="text-xs text-slate-400">
-              Live observability stream with log rotation across Server, Local Agent, TikTok, and 3D Engine
+              Observabilidad en vivo con filtrado reactivo por nivel de prioridad y origen
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => addLog("INFO", "FRONTEND", "Manual test log emitted from developer console")}
-            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 flex items-center gap-1.5 transition-colors"
+            onClick={() => addLog("INFO", "FRONTEND", "Evento de prueba emitido desde consola de observabilidad")}
+            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            Test Event
+            Emitir Prueba
           </button>
           <button
             onClick={handleCopy}
-            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 flex items-center gap-1.5 transition-colors"
+            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-            {copied ? "Copied!" : "Copy Logs"}
+            {copied ? "¡Copiados!" : "Copiar Logs"}
           </button>
           <button
             onClick={clearLogs}
-            className="px-3 py-1.5 rounded-lg bg-rose-950/50 hover:bg-rose-900/80 text-rose-300 text-xs font-medium border border-rose-800 flex items-center gap-1.5 transition-colors"
+            className="px-3 py-1.5 rounded-lg bg-rose-950/50 hover:bg-rose-900/80 text-rose-300 text-xs font-medium border border-rose-800 flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            Clear Buffer
+            Limpiar Buffer
           </button>
         </div>
       </div>
 
-      {/* Filters Bar */}
-      <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
-          <Filter className="w-3.5 h-3.5 text-cyan-400" />
-          Filters:
+      {/* Modern Filter Utility Controls */}
+      <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 space-y-3 shadow-md">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Priority Level Toggle Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5 mr-1">
+              <Filter className="w-3.5 h-3.5 text-cyan-400" />
+              Prioridad:
+            </span>
+
+            <div className="inline-flex rounded-lg bg-slate-950 p-1 border border-slate-800">
+              <button
+                onClick={() => setSelectedLevel("ALL")}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  selectedLevel === "ALL"
+                    ? "bg-slate-800 text-white shadow-sm"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <span>TODOS</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-900 text-slate-400">
+                  {counts.all}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setSelectedLevel("INFO")}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  selectedLevel === "INFO"
+                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm"
+                    : "text-slate-400 hover:text-cyan-300"
+                }`}
+              >
+                <Info className="w-3 h-3 text-cyan-400" />
+                <span>INFO</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-cyan-950 text-cyan-300">
+                  {counts.info}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setSelectedLevel("WARN")}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  selectedLevel === "WARN"
+                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm"
+                    : "text-slate-400 hover:text-amber-300"
+                }`}
+              >
+                <AlertTriangle className="w-3 h-3 text-amber-400" />
+                <span>WARN</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-950 text-amber-300">
+                  {counts.warn}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setSelectedLevel("ERROR")}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  selectedLevel === "ERROR"
+                    ? "bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm"
+                    : "text-slate-400 hover:text-rose-300"
+                }`}
+              >
+                <AlertOctagon className="w-3 h-3 text-rose-400" />
+                <span>ERROR</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-rose-950 text-rose-300">
+                  {counts.error}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setSelectedLevel("DEBUG")}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  selectedLevel === "DEBUG"
+                    ? "bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm"
+                    : "text-slate-400 hover:text-purple-300"
+                }`}
+              >
+                <Bug className="w-3 h-3 text-purple-400" />
+                <span>DEBUG</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-purple-950 text-purple-300">
+                  {counts.debug}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Source Toggle Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5 mr-1">
+              <Layers className="w-3.5 h-3.5 text-indigo-400" />
+              Origen:
+            </span>
+
+            <div className="inline-flex rounded-lg bg-slate-950 p-1 border border-slate-800">
+              <button
+                onClick={() => setSelectedSource("ALL")}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  selectedSource === "ALL"
+                    ? "bg-slate-800 text-white shadow-sm"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <span>TODOS</span>
+              </button>
+
+              <button
+                onClick={() => setSelectedSource("TIKTOK")}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  selectedSource === "TIKTOK"
+                    ? "bg-pink-500/20 text-pink-300 border border-pink-500/40 shadow-sm"
+                    : "text-slate-400 hover:text-pink-300"
+                }`}
+              >
+                <Music2 className="w-3 h-3 text-pink-400" />
+                <span>TIKTOK</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-pink-950 text-pink-300">
+                  {counts.tiktok}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setSelectedSource("AI")}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  selectedSource === "AI"
+                    ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-sm"
+                    : "text-slate-400 hover:text-indigo-300"
+                }`}
+              >
+                <Sparkles className="w-3 h-3 text-indigo-400" />
+                <span>AI</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-950 text-indigo-300">
+                  {counts.ai}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setSelectedSource("SYSTEM")}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  selectedSource === "SYSTEM"
+                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm"
+                    : "text-slate-400 hover:text-emerald-300"
+                }`}
+              >
+                <Server className="w-3 h-3 text-emerald-400" />
+                <span>SYSTEM</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-950 text-emerald-300">
+                  {counts.system}
+                </span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Level Selector */}
-        <select
-          value={selectedLevel}
-          onChange={(e) => setSelectedLevel(e.target.value)}
-          className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
-        >
-          <option value="ALL">All Levels</option>
-          <option value="INFO">INFO</option>
-          <option value="WARN">WARN</option>
-          <option value="ERROR">ERROR</option>
-          <option value="DEBUG">DEBUG</option>
-        </select>
+        {/* Search input and Active Filter summary */}
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800/60">
+          <div className="relative flex-1 min-w-[240px]">
+            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              placeholder="Buscar en mensajes, códigos o detalles de telemetría..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 placeholder-slate-500"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
 
-        {/* Scope Selector */}
-        <select
-          value={selectedScope}
-          onChange={(e) => setSelectedScope(e.target.value)}
-          className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
-        >
-          <option value="ALL">All Scopes</option>
-          <option value="SERVER">SERVER</option>
-          <option value="FRONTEND">FRONTEND</option>
-          <option value="AGENT">AGENT</option>
-          <option value="TIKTOK">TIKTOK</option>
-          <option value="3D">3D</option>
-        </select>
-
-        {/* Search input */}
-        <div className="flex-1 min-w-[200px]">
-          <input
-            type="text"
-            placeholder="Search log messages..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 placeholder-slate-500"
-          />
+          {(selectedLevel !== "ALL" || selectedSource !== "ALL" || search) && (
+            <button
+              onClick={() => {
+                setSelectedLevel("ALL");
+                setSelectedSource("ALL");
+                setSearch("");
+              }}
+              className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 flex items-center gap-1 transition-colors cursor-pointer"
+            >
+              <X className="w-3 h-3 text-slate-400" />
+              Restablecer Filtros
+            </button>
+          )}
         </div>
       </div>
 
@@ -168,15 +386,25 @@ export function LogsView() {
         <div className="bg-slate-900/90 border-b border-slate-800 px-4 py-2 flex items-center justify-between text-slate-400 text-[11px]">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>LOG STREAM DISPATCHER ACTIVE</span>
+            <span>TRANSMISIÓN DE TELEMETRÍA DISPATCHER ACTIVA</span>
           </div>
-          <span>Max Buffer: 500 entries (Pruning oldest)</span>
+          <span>Filtro activo: {selectedLevel} / {selectedSource} • Mostrando {filteredLogs.length} de {logs.length}</span>
         </div>
 
-        <div className="p-4 space-y-2 max-h-[500px] overflow-y-auto">
+        <div className="p-4 space-y-2 max-h-[520px] overflow-y-auto">
           {filteredLogs.length === 0 ? (
-            <div className="text-center py-12 text-slate-500 italic">
-              No log entries match the current filter criteria.
+            <div className="text-center py-12 text-slate-500 italic space-y-2">
+              <p>No se encontraron eventos con los filtros seleccionados ({selectedLevel} / {selectedSource}).</p>
+              <button
+                onClick={() => {
+                  setSelectedLevel("ALL");
+                  setSelectedSource("ALL");
+                  setSearch("");
+                }}
+                className="text-xs text-cyan-400 hover:underline cursor-pointer"
+              >
+                Limpiar filtros para ver todos los registros
+              </button>
             </div>
           ) : (
             filteredLogs.map((log) => (

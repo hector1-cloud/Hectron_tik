@@ -1,7 +1,8 @@
 import { useState, useEffect, useContext, useCallback } from "react";
-import { Radio, Wifi, WifiOff, Send, Gift, Heart, Users, CheckCircle2, AlertCircle, RefreshCw, Key, ShieldCheck, Sparkles, Play, ToggleLeft, ToggleRight } from "lucide-react";
+import { Radio, Wifi, WifiOff, Send, Gift, Heart, Users, CheckCircle2, AlertCircle, RefreshCw, Key, ShieldCheck, Sparkles, Play, ToggleLeft, ToggleRight, QrCode, Smartphone } from "lucide-react";
 import { BrainContext } from "../BrainContext";
 import { useWebSocketReconnection } from "../hooks/useWebSocketReconnection";
+import { TiktokQrAuthCard } from "./TiktokQrAuthCard";
 
 interface LiveEventItem {
   id: string;
@@ -42,7 +43,15 @@ export function TiktokLiveConnectorCard() {
   const [liveEvents, setLiveEvents] = useState<LiveEventItem[]>([]);
   const [roomQueryStatus, setRoomQueryStatus] = useState<any>(null);
   const [checkingLive, setCheckingLive] = useState<boolean>(false);
-  const [manualText, setManualText] = useState<string>("");
+  const [manualText, setManualText] = useState<string>("" );
+  const [authMode, setAuthMode] = useState<"username" | "qr">("qr");
+
+  const handleStreamerAuthorizedFromQr = (authorizedUsername: string) => {
+    setUsername(authorizedUsername);
+    addLog("INFO", "TIKTOK", `Usuario @${authorizedUsername} sincronizado desde Escaneo de Código QR.`);
+    // Automatically query status and refresh
+    fetchStatus();
+  };
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -297,8 +306,43 @@ export function TiktokLiveConnectorCard() {
         </div>
       </div>
 
-      {/* Connection Form */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      {/* Method Selector Tabs */}
+      <div className="flex bg-slate-900/90 p-1 rounded-xl border border-slate-800 gap-1">
+        <button
+          onClick={() => setAuthMode("qr")}
+          className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs transition cursor-pointer flex items-center justify-center gap-2 ${
+            authMode === "qr"
+              ? "bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-md shadow-pink-950/40"
+              : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <QrCode className="w-3.5 h-3.5" />
+          <span>📱 Conexión Código QR & Listener Webhook / Polling (Recomendado)</span>
+        </button>
+        <button
+          onClick={() => setAuthMode("username")}
+          className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs transition cursor-pointer flex items-center justify-center gap-2 ${
+            authMode === "username"
+              ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-950/40"
+              : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <Radio className="w-3.5 h-3.5" />
+          <span>⚡ Conexión Directa por @Usuario (Webcast Push)</span>
+        </button>
+      </div>
+
+      {/* Mode 1: QR Code Scanner with Realtime Listener */}
+      {authMode === "qr" && (
+        <div className="animate-fadeIn">
+          <TiktokQrAuthCard onStreamerConnected={handleStreamerAuthorizedFromQr} />
+        </div>
+      )}
+
+      {/* Mode 2: Username Direct Form */}
+      {authMode === "username" && (
+        <div className="animate-fadeIn space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="md:col-span-2 space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">
@@ -462,6 +506,8 @@ export function TiktokLiveConnectorCard() {
               <span>Enviar Like</span>
             </button>
           </div>
+        </div>
+      )}
         </div>
       )}
 

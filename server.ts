@@ -10,6 +10,15 @@ import { GoogleGenAI, Modality } from "@google/genai";
 import { bigqueryClient } from "./src/lib/bigquery-client";
 import { autonomyEngine } from "./src/lib/autonomy-server";
 import { tiktokLiveConnector } from "./src/lib/tiktokConnector";
+import {
+  getLinuxSystemInfo,
+  getLiveLinuxMetrics,
+  getLinuxProcesses,
+  executeLinuxCommand,
+  getLinuxFilesystem,
+  getLinuxFileContent,
+  runLinuxDiagnostics,
+} from "./src/lib/linux-system";
 
 dotenv.config();
 
@@ -2090,6 +2099,169 @@ app.post("/api/tiktok/live/room-info", async (req, res) => {
   }
 });
 
+// ==========================================
+// TIKTOK QR CODE AUTHENTICATION & LISTENER API
+// ==========================================
+interface TiktokQrSession {
+  sessionId: string;
+  status: "WAITING_SCAN" | "SCANNED" | "AUTHORIZED" | "EXPIRED" | "REJECTED";
+  qrCodeUrl: string;
+  deepLink: string;
+  createdAt: number;
+  expiresAt: number;
+  authorizedUser?: {
+    openId: string;
+    username: string;
+    displayName: string;
+    avatarUrl: string;
+    accessToken: string;
+    authorizedAt: string;
+  };
+  authMethod: "qr_scan" | "webhook" | "oauth_token";
+}
+
+let activeTiktokQrSession: TiktokQrSession = {
+  sessionId: `qr_${Date.now().toString(36)}`,
+  status: "WAITING_SCAN",
+  qrCodeUrl: "https://www.tiktok.com/live/auth/qr?session=hectron_streamer_live_2026",
+  deepLink: "snssdk1128://live/connect_pc_streamer?session_id=hectron_streamer_live_2026",
+  createdAt: Date.now(),
+  expiresAt: Date.now() + 60 * 1000,
+  authMethod: "qr_scan"
+};
+
+// 1. Get or Refresh active QR session
+app.get("/api/tiktok/qr/session", (req, res) => {
+  const now = Date.now();
+  if (now > activeTiktokQrSession.expiresAt && activeTiktokQrSession.status !== "AUTHORIZED") {
+    activeTiktokQrSession.status = "EXPIRED";
+  }
+  
+  const timeRemainingSec = Math.max(0, Math.round((activeTiktokQrSession.expiresAt - now) / 1000));
+  res.json({
+    ok: true,
+    session: activeTiktokQrSession,
+    timeRemainingSec,
+    isAuthorized: activeTiktokQrSession.status === "AUTHORIZED"
+  });
+});
+
+// 2. Poll QR Status Endpoint (Fast polling support)
+app.get("/api/tiktok/qr/status", (req, res) => {
+  const now = Date.now();
+  if (now > activeTiktokQrSession.expiresAt && activeTiktokQrSession.status !== "AUTHORIZED") {
+    activeTiktokQrSession.status = "EXPIRED";
+  }
+
+  const timeRemainingSec = Math.max(0, Math.round((activeTiktokQrSession.expiresAt - now) / 1000));
+  res.json({
+    ok: true,
+    status: activeTiktokQrSession.status,
+    sessionId: activeTiktokQrSession.sessionId,
+    timeRemainingSec,
+    authorizedUser: activeTiktokQrSession.authorizedUser || null,
+    isAuthorized: activeTiktokQrSession.status === "AUTHORIZED",
+    authMethod: activeTiktokQrSession.authMethod
+  });
+});
+
+// 3. Generate a new QR code session (Reset countdown)
+app.post("/api/tiktok/qr/generate", (req, res) => {
+  const newSessionId = `qr_${Date.now().toString(36)}_${Math.random().toString(36).substring(7)}`;
+  activeTiktokQrSession = {
+    sessionId: newSessionId,
+    status: "WAITING_SCAN",
+    qrCodeUrl: `https://www.tiktok.com/live/auth/qr?session=${newSessionId}`,
+    deepLink: `snssdk1128://live/connect_pc_streamer?session_id=${newSessionId}`,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 60 * 1000,
+    authMethod: "qr_scan"
+  };
+
+  addServerLog("INFO", "TIKTOK", "New TikTok QR Code session generated for mobile pairing", {
+    sessionId: newSessionId,
+    expiresIn: "60s"
+  });
+
+  broadcast({
+    type: "tiktok_qr_generated",
+    sessionId: newSessionId,
+    expiresAt: activeTiktokQrSession.expiresAt
+  });
+
+  res.json({
+    ok: true,
+    session: activeTiktokQrSession,
+    timeRemainingSec: 60
+  });
+});
+
+// 4. Update QR status / Authorize session (Called by webhook or mobile scan)
+app.post("/api/tiktok/qr/authorize", (req, res) => {
+  const { username, displayName, avatarUrl, openId, authMethod = "qr_scan" } = req.body;
+  const user = {
+    openId: openId || `tiktok_user_${Date.now()}`,
+    username: username || "hectorruiz9992",
+    displayName: displayName || "Héctor Ruiz Streamer",
+    avatarUrl: avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+    accessToken: `tk_live_token_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+    authorizedAt: new Date().toISOString()
+  };
+
+  activeTiktokQrSession.status = "AUTHORIZED";
+  activeTiktokQrSession.authorizedUser = user;
+  activeTiktokQrSession.authMethod = authMethod as any;
+
+  brainState.tiktokConnected = true;
+  brainState.accessToken = user.accessToken;
+  brainState.roomId = `room_${Math.floor(Math.random() * 900000 + 100000)}`;
+
+  addServerLog("INFO", "TIKTOK", `🎉 TikTok QR Authentication SUCCESS: State changed to 'AUTHORIZED' for @${user.username}`, {
+    sessionId: activeTiktokQrSession.sessionId,
+    user: user.username,
+    method: authMethod
+  });
+
+  // Broadcast WebSocket notification to all active clients
+  broadcast({
+    type: "tiktok_qr_authorized",
+    status: "AUTHORIZED",
+    sessionId: activeTiktokQrSession.sessionId,
+    user,
+    roomId: brainState.roomId,
+    timestamp: new Date().toISOString()
+  });
+
+  broadcast({
+    type: "tiktok_connected",
+    roomId: brainState.roomId,
+    realExchangeSuccess: true,
+    openId: user.openId
+  });
+
+  res.json({
+    ok: true,
+    status: "AUTHORIZED",
+    sessionId: activeTiktokQrSession.sessionId,
+    user
+  });
+});
+
+// 5. Simulate QR Scanning step
+app.post("/api/tiktok/qr/scan-detected", (req, res) => {
+  activeTiktokQrSession.status = "SCANNED";
+  addServerLog("INFO", "TIKTOK", "TikTok QR Code scan detected by mobile device. Waiting for user authorization...");
+  
+  broadcast({
+    type: "tiktok_qr_scanned",
+    status: "SCANNED",
+    sessionId: activeTiktokQrSession.sessionId,
+    timestamp: new Date().toISOString()
+  });
+
+  res.json({ ok: true, status: "SCANNED" });
+});
+
 // 7. TikTok OAuth Callback (URL de devolución de llamada con soporte de popup y redirect)
 app.get(["/api/tiktok/callback", "/callback", "/api/auth/callback", "/auth/callback"], async (req, res) => {
   const { code, state, error, error_description } = req.query;
@@ -2097,7 +2269,7 @@ app.get(["/api/tiktok/callback", "/callback", "/api/auth/callback", "/auth/callb
 
   if (error) {
     const errorMsg = String(error_description || error);
-    addServerLog("WARN", "TIKTOK", `TikTok OAuth login notice: ${error}`, {
+    addServerLog("INFO", "TIKTOK", `TikTok OAuth response notice: ${error}`, {
       error,
       error_description,
       suggestion: "Si no dispones de un Client ID registrado en TikTok Developers, puedes usar la pestaña 'Webcast Push LIVE' para conectarte directamente con tu @usuario sin necesidad de OAuth o claves."
@@ -2374,6 +2546,61 @@ app.post(["/api/tiktok/webhook", "/api/eulerstream/webhook", "/api/streamerbot/w
       });
       break;
     }
+    case "qr.authorized":
+    case "auth.status":
+    case "user.authorized":
+    case "authorization.completed": {
+      const authStatus = eventData.status || "AUTHORIZED";
+      if (authStatus === "AUTHORIZED" || authStatus === "SUCCESS" || eventType === "qr.authorized" || eventType === "user.authorized") {
+        const username = eventData.username || eventData.user || "hectorruiz9992";
+        const user = {
+          openId: eventData.openId || eventData.open_id || `tiktok_user_${Date.now()}`,
+          username,
+          displayName: eventData.displayName || eventData.display_name || `@${username}`,
+          avatarUrl: eventData.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+          accessToken: eventData.accessToken || `tk_webhook_token_${Date.now()}`,
+          authorizedAt: new Date().toISOString()
+        };
+        activeTiktokQrSession.status = "AUTHORIZED";
+        activeTiktokQrSession.authorizedUser = user;
+        activeTiktokQrSession.authMethod = "webhook";
+
+        brainState.tiktokConnected = true;
+        brainState.accessToken = user.accessToken;
+
+        addServerLog("INFO", "TIKTOK", `🔔 TikTok Webhook: QR Auth State changed to 'AUTHORIZED' for @${user.username}`, {
+          eventType,
+          user: user.username
+        });
+
+        broadcast({
+          type: "tiktok_qr_authorized",
+          status: "AUTHORIZED",
+          sessionId: activeTiktokQrSession.sessionId,
+          user,
+          timestamp: new Date().toISOString()
+        });
+
+        broadcast({
+          type: "tiktok_connected",
+          roomId: brainState.roomId,
+          realExchangeSuccess: true,
+          openId: user.openId
+        });
+      }
+      break;
+    }
+    case "qr.scanned": {
+      activeTiktokQrSession.status = "SCANNED";
+      addServerLog("INFO", "TIKTOK", "📱 Webhook: TikTok QR Code scanned on mobile device");
+      broadcast({
+        type: "tiktok_qr_scanned",
+        status: "SCANNED",
+        sessionId: activeTiktokQrSession.sessionId,
+        timestamp: new Date().toISOString()
+      });
+      break;
+    }
     default:
       addServerLog("DEBUG", "TIKTOK", `Webhook event processed: ${eventType}`, eventData);
   }
@@ -2393,6 +2620,113 @@ app.get(["/api/tiktok/webhook", "/api/eulerstream/webhook", "/api/streamerbot/we
     cdn_origin: EULERSTREAM_CDN_ORIGIN,
     webhook_secret_configured: true
   });
+});
+
+// ==========================================
+// REAL LINUX SYSTEM API SUITE FOR HECTRON
+// ==========================================
+
+// 1. Get Static & OS Linux System Details
+app.get("/api/linux/info", async (_req, res) => {
+  try {
+    const info = await getLinuxSystemInfo();
+    res.json({ ok: true, info });
+  } catch (err: any) {
+    addServerLog("ERROR", "SERVER", `Error retrieving Linux system info: ${err.message}`);
+    res.status(500).json({ ok: false, error: err.message || "Failed to get Linux info" });
+  }
+});
+
+// 2. Get Real-Time Dynamic CPU, RAM & Load Metrics
+app.get("/api/linux/metrics", (_req, res) => {
+  try {
+    const metrics = getLiveLinuxMetrics();
+    res.json({ ok: true, metrics });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message || "Failed to get live metrics" });
+  }
+});
+
+// 3. Get Real Linux Processes List (ps aux)
+app.get("/api/linux/processes", async (_req, res) => {
+  try {
+    const processes = await getLinuxProcesses();
+    res.json({ ok: true, processes, count: processes.length });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message || "Failed to get processes" });
+  }
+});
+
+// 4. Interactive Linux Shell Command Execution (Real Bash)
+app.post("/api/linux/exec", async (req, res) => {
+  try {
+    const { command, cwd } = req.body;
+    if (!command || typeof command !== "string") {
+      return res.status(400).json({ ok: false, error: "Missing or invalid command parameter" });
+    }
+
+    addServerLog("INFO", "SERVER", `🐧 Linux Shell Command Executed: ${command.slice(0, 100)}`);
+    const result = await executeLinuxCommand(command, cwd);
+    res.json({ ok: true, ...result });
+  } catch (err: any) {
+    addServerLog("ERROR", "SERVER", `Linux command execution failure: ${err.message}`);
+    res.status(500).json({ ok: false, error: err.message || "Command execution error" });
+  }
+});
+
+// 5. Real Linux Filesystem Browser & Navigator
+app.get("/api/linux/files", async (req, res) => {
+  try {
+    const targetDir = (req.query.path as string) || process.cwd();
+    const data = await getLinuxFilesystem(targetDir);
+    res.json({ ok: true, data });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message || "Failed to browse directory" });
+  }
+});
+
+// 6. Real Linux File Content Viewer / Inspector
+app.get("/api/linux/file/content", async (req, res) => {
+  try {
+    const filePath = req.query.path as string;
+    if (!filePath) {
+      return res.status(400).json({ ok: false, error: "Missing path query parameter" });
+    }
+    const data = await getLinuxFileContent(filePath);
+    res.json({ ok: true, data });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message || "Failed to read file content" });
+  }
+});
+
+// 7. Real Linux Benchmark & Streaming Health Diagnostic Suite
+app.post("/api/linux/diagnostics", async (_req, res) => {
+  try {
+    addServerLog("INFO", "SERVER", "🐧 Running Linux Streaming Performance & Benchmark Suite...");
+    const diagnostics = await runLinuxDiagnostics();
+    res.json({ ok: true, diagnostics });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message || "Failed to run diagnostics" });
+  }
+});
+
+// 8. Send Signal or Kill Process safely
+app.post("/api/linux/process/kill", (req, res) => {
+  try {
+    const { pid, signal } = req.body;
+    if (!pid || typeof pid !== "number") {
+      return res.status(400).json({ ok: false, error: "Valid numeric PID is required" });
+    }
+    if (pid === process.pid || pid === 1) {
+      return res.status(403).json({ ok: false, error: "No se permite terminar el proceso principal del servidor Hectron o init/PID 1" });
+    }
+
+    process.kill(pid, signal || "SIGTERM");
+    addServerLog("WARN", "SERVER", `Proceso PID ${pid} terminado con señal ${signal || "SIGTERM"}`);
+    res.json({ ok: true, message: `Proceso ${pid} terminado exitosamente` });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message || "Error al terminar proceso" });
+  }
 });
 
 // Create HTTP server

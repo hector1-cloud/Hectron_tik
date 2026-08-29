@@ -46,7 +46,7 @@ export function BrainProvider({ children }: { children: ReactNode }) {
 
   const [isAutonomous, setIsAutonomous] = useState<boolean>(true);
   const [tiktokConnected, setTiktokConnected] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "game" | "inventory" | "saves" | "overlay" | "agent" | "tiktok" | "duix" | "streamerbot" | "logs" | "performance" | "autonomy" | "workers-ai" | "workflows" | "executive" | "enterprise" | "sims">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "game" | "inventory" | "saves" | "overlay" | "agent" | "tiktok" | "duix" | "streamerbot" | "logs" | "performance" | "autonomy" | "workers-ai" | "workflows" | "executive" | "enterprise" | "sims" | "livestudio" | "linux" | "studio3d" | "analytics">("dashboard");
 
   // LOD & FPS state for 3D optimization
   const [lodLevel, setLodLevel] = useState<"HIGH" | "MEDIUM" | "LOW">("HIGH");

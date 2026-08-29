@@ -186,8 +186,8 @@ export interface BrainContextType {
   setTiktokConnected: (val: boolean) => void;
   messages: ChatMessage[];
   addMessage: (msg: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
-  activeTab: 'dashboard' | 'game' | 'inventory' | 'saves' | 'overlay' | 'agent' | 'tiktok' | 'duix' | 'streamerbot' | 'logs' | 'performance' | 'autonomy' | 'workers-ai' | 'workflows' | 'executive' | 'enterprise' | 'sims';
-  setActiveTab: (tab: 'dashboard' | 'game' | 'inventory' | 'saves' | 'overlay' | 'agent' | 'tiktok' | 'duix' | 'streamerbot' | 'logs' | 'performance' | 'autonomy' | 'workers-ai' | 'workflows' | 'executive' | 'enterprise' | 'sims') => void;
+  activeTab: 'dashboard' | 'game' | 'inventory' | 'saves' | 'overlay' | 'agent' | 'tiktok' | 'duix' | 'streamerbot' | 'logs' | 'performance' | 'autonomy' | 'workers-ai' | 'workflows' | 'executive' | 'enterprise' | 'sims' | 'livestudio' | 'linux' | 'studio3d' | 'analytics';
+  setActiveTab: (tab: 'dashboard' | 'game' | 'inventory' | 'saves' | 'overlay' | 'agent' | 'tiktok' | 'duix' | 'streamerbot' | 'logs' | 'performance' | 'autonomy' | 'workers-ai' | 'workflows' | 'executive' | 'enterprise' | 'sims' | 'livestudio' | 'linux' | 'studio3d' | 'analytics') => void;
   speakText: (text: string, emotion?: Emotion, customAnimation?: AvatarAnimationClass, customVoiceConfig?: Partial<TtsVoiceSettings>) => Promise<void>;
   latestSpeechText: string;
   isSpeaking: boolean;
@@ -245,6 +245,54 @@ export interface DuixCreateAvatarResponse {
     [key: string]: any;
   };
   [key: string]: any;
+}
+
+export type VoiceCommandCategory = 'scene' | 'stream' | 'emotion' | 'game' | 'navigation';
+
+export interface VoiceCommandItem {
+  id: string;
+  title: string;
+  phrase: string;
+  category: VoiceCommandCategory;
+  description: string;
+  aliases: string[];
+  samplePayload?: any;
+}
+
+export interface VoiceRecognitionState {
+  isListening: boolean;
+  transcript: string;
+  interimTranscript: string;
+  lastCommand: VoiceCommandItem | null;
+  lastExecutionTime: string | null;
+  lastStatus: 'idle' | 'matched' | 'unrecognized' | 'error';
+  statusMessage?: string;
+  isSupported: boolean;
+  permissionGranted: boolean;
+  language: string;
+  continuous: boolean;
+  audioFeedback: boolean;
+  voiceAck: boolean;
+}
+
+export interface LinuxSystemState {
+  info: any | null;
+  metrics: any | null;
+  processes: any[];
+  filesystem: {
+    currentPath: string;
+    parentPath: string | null;
+    entries: any[];
+  } | null;
+  diagnostics: any | null;
+  terminalHistory: Array<{
+    command: string;
+    stdout: string;
+    stderr: string;
+    exitCode: number;
+    timestamp: string;
+    timeMs: number;
+  }>;
 }
 
 

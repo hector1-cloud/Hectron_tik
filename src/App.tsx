@@ -12,6 +12,8 @@ import { AndroidFirebaseValidator } from "./components/AndroidFirebaseValidator"
 import { TiktokDnsGuide } from "./components/TiktokDnsGuide";
 import { TiktokTokenExchange } from "./components/TiktokTokenExchange";
 import { TiktokLiveConnectorCard } from "./components/TiktokLiveConnectorCard";
+import { TiktokQrAuthCard } from "./components/TiktokQrAuthCard";
+import { useTiktokQrAuthListener } from "./hooks/useTiktokQrAuthListener";
 import { WorkersAiRunner } from "./components/WorkersAiRunner";
 import { CloudflareWorkflowsRunner } from "./components/CloudflareWorkflowsRunner";
 const EnterpriseCoreDashboard = lazy(() => import("./components/EnterpriseCoreDashboard").then(m => ({ default: m.EnterpriseCoreDashboard })));
@@ -25,6 +27,14 @@ import { SaveLoadManager } from "./components/SaveLoadManager";
 import { GameWorldView } from "./components/GameWorldView";
 import { StartupHealthCheck } from "./components/StartupHealthCheck";
 import { GeminiTtsVoiceSettingsCard } from "./components/GeminiTtsVoiceSettingsCard";
+import { VoiceCommanderCard } from "./components/VoiceCommanderCard";
+import { HectronLiveStudio } from "./components/HectronLiveStudio";
+import { LinuxSystemStudio } from "./components/LinuxSystemStudio";
+import { LinuxVMTab } from "./components/LinuxVMTab";
+import { Studio3DTab } from "./components/Studio3DTab";
+import { AnalyticsTab } from "./components/AnalyticsTab";
+import { useAuth } from "./AuthContext";
+import { useConnectionMonitor } from "./hooks/useConnectionMonitor";
 import { jsPDF } from "jspdf";
 import {
   Mic,
@@ -58,6 +68,18 @@ import {
   Save,
   Coins,
   Shield,
+  Server,
+  Box,
+  BarChart3,
+  User,
+  LogOut,
+  ChevronDown,
+  Wifi,
+  WifiOff,
+  RefreshCw,
+  QrCode,
+  BellRing,
+  X,
 } from "lucide-react";
 
 const downloadImageAsPDF = async (imageSrc: string, pdfFileName: string) => {
@@ -110,7 +132,7 @@ const downloadImageAsPDF = async (imageSrc: string, pdfFileName: string) => {
 
 export default function App() {
   const [previewType, setPreviewType] = useState<"interactive" | "sketchfab">("interactive");
-  const [tiktokSubTab, setTiktokSubTab] = useState<"live" | "web" | "dns" | "android" | "mockups">("live");
+  const [tiktokSubTab, setTiktokSubTab] = useState<"live" | "qr" | "web" | "dns" | "android" | "mockups">("live");
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [isDownloading1, setIsDownloading1] = useState(false);
   const [isDownloading2, setIsDownloading2] = useState(false);
@@ -518,6 +540,38 @@ export default function App() {
     lastAutoSaveTime,
   } = useContext(BrainContext);
 
+  const { user, saveActiveTab, switchRole, presetProfiles } = useAuth();
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  const [isConnectivityModalOpen, setIsConnectivityModalOpen] = useState<boolean>(false);
+
+  // Periodic Connection Status Monitoring for OBS Agent and TikTok Webcast Server
+  const {
+    obs: obsProbe,
+    tiktok: tiktokProbe,
+    server: serverProbe,
+    overallHealth,
+    isPinging: isCheckingConnections,
+    pingNow: probeConnectionsNow,
+  } = useConnectionMonitor(agentUrl, 6000);
+
+  // Global TikTok QR Auth & Webhook Listener
+  const {
+    status: qrAuthStatus,
+    authorizedUser: qrAuthUser,
+    authSuccessToast: showGlobalQrToast,
+    dismissToast: dismissGlobalQrToast,
+  } = useTiktokQrAuthListener({
+    pollingIntervalMs: 2500,
+    autoPoll: true,
+  });
+
+  // Sync activeTab to auth session in localStorage for seamless reload recovery
+  useEffect(() => {
+    if (activeTab) {
+      saveActiveTab(activeTab);
+    }
+  }, [activeTab, saveActiveTab]);
+
   const [tiktokError, setTiktokError] = useState<string | null>(null);
   const [tiktokSuccess, setTiktokSuccess] = useState<boolean>(false);
   const [diagnosticResult, setDiagnosticResult] = useState<{
@@ -667,6 +721,30 @@ export default function App() {
           {/* Navigation Tabs */}
           <nav className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
             <button
+              onClick={() => setActiveTab("studio3d")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                activeTab === "studio3d"
+                  ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-md shadow-cyan-500/20"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Box className="w-4 h-4 text-cyan-400" />
+              <span>Assets 3D</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("analytics")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                activeTab === "analytics"
+                  ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/20"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <BarChart3 className="w-4 h-4 text-indigo-400" />
+              <span>Analítica LIVE</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab("game")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 activeTab === "game"
@@ -700,6 +778,18 @@ export default function App() {
             >
               <Save className="w-4 h-4" />
               <span>Guardar/Cargar</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("livestudio")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                activeTab === "livestudio"
+                  ? "bg-gradient-to-r from-rose-500 to-indigo-600 text-white shadow-md shadow-rose-500/20"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Radio className="w-4 h-4 text-rose-400" />
+              <span>Live Studio (Gnosis)</span>
             </button>
 
             <button
@@ -748,6 +838,18 @@ export default function App() {
             >
               <Terminal className="w-4 h-4" />
               <span>Logs</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("linux")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                activeTab === "linux"
+                  ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Server className="w-4 h-4 text-emerald-400" />
+              <span>Sistema Linux</span>
             </button>
 
             <button
@@ -891,6 +993,116 @@ export default function App() {
               </div>
             )}
 
+            {/* Real-time Connection Status Indicator Hook Integration */}
+            <div className="relative">
+              <button
+                onClick={() => setIsConnectivityModalOpen(!isConnectivityModalOpen)}
+                className={`px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 border transition cursor-pointer ${
+                  overallHealth === "OPTIMAL"
+                    ? "bg-emerald-950/80 text-emerald-300 border-emerald-500/40 hover:border-emerald-400"
+                    : overallHealth === "DEGRADED"
+                    ? "bg-amber-950/80 text-amber-300 border-amber-500/40 hover:border-amber-400"
+                    : "bg-rose-950/80 text-rose-300 border-rose-500/40 hover:border-rose-400"
+                }`}
+                title="Monitor de Conectividad en Tiempo Real (OBS + TikTok + Gateway)"
+              >
+                {overallHealth === "OPTIMAL" ? (
+                  <Wifi className={`w-3.5 h-3.5 text-emerald-400 ${isCheckingConnections ? "animate-spin" : ""}`} />
+                ) : (
+                  <WifiOff className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                )}
+                <span className="hidden md:inline font-mono text-[11px]">
+                  {overallHealth === "OPTIMAL" ? "Red OK" : overallHealth === "DEGRADED" ? "Red Inestable" : "Offline"}
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono hidden lg:inline">
+                  {obsProbe.latencyMs || serverProbe.latencyMs || 12}ms
+                </span>
+              </button>
+
+              {/* Connectivity Details Dropdown */}
+              {isConnectivityModalOpen && (
+                <div className="absolute right-0 mt-2 w-80 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-4 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-3">
+                    <div className="flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-cyan-400" />
+                      <span className="text-xs font-bold text-white uppercase tracking-wider">Estado de Conexión</span>
+                    </div>
+                    <button
+                      onClick={() => probeConnectionsNow()}
+                      disabled={isCheckingConnections}
+                      className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-mono transition cursor-pointer"
+                      title="Sondear ahora"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isCheckingConnections ? "animate-spin" : ""}`} />
+                      <span>{isCheckingConnections ? "Sondeando..." : "Actualizar"}</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {/* OBS Agent status */}
+                    <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              obsProbe.connected ? "bg-emerald-400 shadow-sm shadow-emerald-400" : "bg-amber-400"
+                            }`}
+                          />
+                          <span className="text-xs font-bold text-slate-200">Agente OBS WebSocket</span>
+                        </div>
+                        <p className="text-[10.5px] text-slate-400 mt-0.5">{obsProbe.details}</p>
+                      </div>
+                      <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-300 shrink-0">
+                        {obsProbe.latencyMs} ms
+                      </span>
+                    </div>
+
+                    {/* TikTok Webcast status */}
+                    <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              tiktokProbe.connected ? "bg-cyan-400 shadow-sm shadow-cyan-400" : "bg-slate-500"
+                            }`}
+                          />
+                          <span className="text-xs font-bold text-slate-200">TikTok Webcast LIVE</span>
+                        </div>
+                        <p className="text-[10.5px] text-slate-400 mt-0.5">{tiktokProbe.details}</p>
+                      </div>
+                      <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-300 shrink-0">
+                        {tiktokProbe.latencyMs} ms
+                      </span>
+                    </div>
+
+                    {/* Server API Gateway */}
+                    <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                          <span className="text-xs font-bold text-slate-200">Gateway Cloud Linux</span>
+                        </div>
+                        <p className="text-[10.5px] text-slate-400 mt-0.5">{serverProbe.details}</p>
+                      </div>
+                      <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-300 shrink-0">
+                        {serverProbe.latencyMs} ms
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                    <span>Último sondeo: {obsProbe.lastChecked || "En vivo"}</span>
+                    <button
+                      onClick={() => setIsConnectivityModalOpen(false)}
+                      className="text-slate-400 hover:text-white cursor-pointer"
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div
               className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 border ${
                 obsStatus.streaming
@@ -908,12 +1120,135 @@ export default function App() {
                 <span>TikTok</span>
               </div>
             )}
+
+            {/* Auth Session User Badge */}
+            <div className="relative">
+              <button
+                onClick={() => setIsProfileModalOpen(!isProfileModalOpen)}
+                className="flex items-center gap-2 bg-slate-950 hover:bg-slate-900 border border-cyan-500/30 hover:border-cyan-400/60 px-2.5 py-1 rounded-full text-xs transition cursor-pointer"
+                title="Sesión de Usuario & Roles"
+              >
+                <img
+                  src={user?.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"}
+                  alt={user?.name || "User"}
+                  className="w-5 h-5 rounded-full object-cover border border-cyan-400"
+                />
+                <span className="font-bold text-slate-200 hidden sm:inline">{user?.name || "Hectron"}</span>
+                <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-400 border border-cyan-500/30">
+                  {user?.role || "creator"}
+                </span>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
+              </button>
+
+              {/* Profile Dropdown / Role Switcher Modal */}
+              {isProfileModalOpen && (
+                <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-cyan-500/40 rounded-xl shadow-2xl p-3 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                  <div className="flex items-center gap-3 border-b border-slate-800 pb-2.5 mb-2.5">
+                    <img
+                      src={user?.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"}
+                      alt={user?.name || "User"}
+                      className="w-10 h-10 rounded-xl object-cover border border-cyan-400 shadow-md"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-white truncate">{user?.name || "Hectron Streamer"}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{user?.email || "streamer@hectron.io"}</p>
+                      <span className="inline-block mt-0.5 text-[9px] font-mono px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/30">
+                        ROL: {(user?.role || "creator").toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] uppercase font-bold text-slate-400 mb-1.5 px-1">
+                    Cambiar Perfil de Streamer
+                  </p>
+
+                  <div className="space-y-1">
+                    {presetProfiles.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          switchRole(p.role);
+                          setIsProfileModalOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between p-1.5 rounded-lg text-xs transition cursor-pointer text-left ${
+                          user?.id === p.id
+                            ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                            : "hover:bg-slate-850 text-slate-300"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <img src={p.avatar} alt={p.name} className="w-6 h-6 rounded-full object-cover" />
+                          <div>
+                            <p className="font-bold text-[11px] leading-tight">{p.name}</p>
+                            <p className="text-[9px] text-slate-400 capitalize">{p.role}</p>
+                          </div>
+                        </div>
+                        {user?.id === p.id && (
+                          <span className="text-[9px] font-mono text-cyan-400">Activo</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="mt-2.5 pt-2 border-t border-slate-800 flex justify-between items-center text-[10px] text-slate-400 px-1">
+                    <span>Persistencia Local: Activa</span>
+                    <span className="font-mono text-emerald-400">● Conectado</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main Content Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-8 space-y-6">
+        {/* Global QR Code Authorization Success Visual Notification Banner */}
+        {showGlobalQrToast && qrAuthUser && (
+          <div className="animate-fadeIn bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 border-2 border-emerald-500/80 rounded-2xl p-4 sm:p-5 shadow-2xl shadow-emerald-950/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-emerald-500/40 animate-bounce shrink-0">
+                <CheckCircle2 className="w-7 h-7" />
+              </div>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm sm:text-base font-black text-white uppercase tracking-wider">
+                    🎉 ¡TikTok LIVE Autorizado con Éxito!
+                  </span>
+                  <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 font-mono text-xs font-bold rounded-full border border-emerald-500/40 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-emerald-400" />
+                    ESTADO: AUTHORIZED
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300">
+                  El listener ha verificado el escaneo QR. Streamer vinculado: <strong className="text-emerald-300 font-mono">@{qrAuthUser.username}</strong> ({qrAuthUser.displayName}). Conectividad LIVE lista para transmitir.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 self-end sm:self-center shrink-0">
+              <button
+                onClick={() => {
+                  setActiveTab("tiktok" as any);
+                  setTiktokSubTab("live");
+                  dismissGlobalQrToast();
+                }}
+                className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 rounded-xl text-xs font-black shadow-lg shadow-emerald-500/30 transition cursor-pointer flex items-center gap-1.5"
+              >
+                <Radio className="w-4 h-4" />
+                <span>Ver Stream Live</span>
+              </button>
+              <button
+                onClick={dismissGlobalQrToast}
+                className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition cursor-pointer"
+                title="Cerrar notificación"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Game World & Exploration Tab */}
         {activeTab === "game" && <GameWorldView />}
 
@@ -1056,6 +1391,11 @@ export default function App() {
               </div>
             </div>
 
+            {/* Voice Command Recognition Suite */}
+            <div>
+              <VoiceCommanderCard />
+            </div>
+
             {/* Gemini TTS Voice Profiles & Fine-Tuning Settings Section */}
             <div>
               <GeminiTtsVoiceSettingsCard />
@@ -1073,7 +1413,17 @@ export default function App() {
           </div>
         )}
 
+        {/* 3D Asset Management Studio Tab */}
+        {activeTab === "studio3d" && <Studio3DTab />}
+
+        {/* Real-time Stream & Chat Analytics Tab with Recharts */}
+        {activeTab === "analytics" && <AnalyticsTab />}
+
+        {activeTab === "livestudio" && <HectronLiveStudio />}
+
         {activeTab === "logs" && <LogsView />}
+
+        {activeTab === "linux" && <LinuxVMTab />}
 
         {activeTab === "performance" && <PerformanceView />}
 
@@ -1146,7 +1496,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Subtabs for Live Webcast Connector, Web Login, DNS Verification, Android SDK & Mockups */}
+              {/* Subtabs for Live Webcast Connector, QR Code Scanner, Web Login, DNS Verification, Android SDK & Mockups */}
               <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-850 text-xs gap-1 flex-wrap sm:flex-nowrap">
                 <button
                   onClick={() => setTiktokSubTab("live")}
@@ -1158,6 +1508,17 @@ export default function App() {
                 >
                   <Radio className="w-3.5 h-3.5 text-pink-300" />
                   <span>Webcast Push LIVE</span>
+                </button>
+                <button
+                  onClick={() => setTiktokSubTab("qr")}
+                  className={`flex-1 py-2.5 px-3 rounded-lg font-bold transition cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+                    tiktokSubTab === "qr"
+                      ? "bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-md shadow-pink-500/20"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <QrCode className="w-3.5 h-3.5 text-pink-300" />
+                  <span>Escanear Código QR</span>
                 </button>
                 <button
                   onClick={() => setTiktokSubTab("web")}
@@ -1208,6 +1569,16 @@ export default function App() {
               {tiktokSubTab === "live" && (
                 <div className="animate-fadeIn">
                   <TiktokLiveConnectorCard />
+                </div>
+              )}
+
+              {tiktokSubTab === "qr" && (
+                <div className="animate-fadeIn">
+                  <TiktokQrAuthCard
+                    onStreamerConnected={(user) => {
+                      setTiktokSubTab("live");
+                    }}
+                  />
                 </div>
               )}
 

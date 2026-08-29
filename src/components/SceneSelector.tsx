@@ -1,6 +1,6 @@
 import { useContext } from "react";
 import { BrainContext } from "../BrainContext";
-import { Layers, Check } from "lucide-react";
+import { Layers, Check, Mic } from "lucide-react";
 
 export function SceneSelector() {
   const { scenes, obsStatus, setObsStatus, agentUrl, setEmotion } = useContext(BrainContext);
@@ -45,9 +45,14 @@ export function SceneSelector() {
           <Layers className="w-5 h-5 text-cyan-400" />
           <h2 className="text-lg font-bold text-white">🎭 Selector de Escenas OBS</h2>
         </div>
-        <span className="text-xs text-slate-400">
-          Escena actual: <strong className="text-cyan-400">{obsStatus.scene || "DEFAULT"}</strong>
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-rose-300 bg-rose-950/60 border border-rose-500/30 px-2 py-0.5 rounded-full">
+            <Mic className="w-3 h-3 text-rose-400" /> Control por voz activo
+          </span>
+          <span className="text-xs text-slate-400">
+            Escena: <strong className="text-cyan-400">{obsStatus.scene || "DEFAULT"}</strong>
+          </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
