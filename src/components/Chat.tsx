@@ -1,11 +1,27 @@
 import { useState, useContext, KeyboardEvent } from "react";
 import { BrainContext } from "../BrainContext";
-import { MessageSquare, Send, Sparkles, Music2, CheckCircle2, User, Bot, Volume2, Gift } from "lucide-react";
+import {
+  MessageSquare,
+  Send,
+  Sparkles,
+  Music2,
+  CheckCircle2,
+  User,
+  Bot,
+  Volume2,
+  Gift,
+  Save,
+  RotateCcw,
+  Trash2,
+  Award,
+  Flame,
+} from "lucide-react";
 
 export function Chat() {
   const {
     messages,
     addMessage,
+    clearMessages,
     tiktokConnected,
     setTiktokConnected,
     setEmotion,
@@ -15,11 +31,16 @@ export function Chat() {
     addLog,
     obsStatus,
     setObsStatus,
+    triggerAchievementCheck,
+    saveStreamerFullState,
+    loadStreamerFullState,
+    equippedRewards,
   } = useContext(BrainContext);
 
   const [input, setInput] = useState("");
   const [tiktokCode, setTiktokCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
   // Reacciona a cada tipo de regalo en TikTok con una animación/emoción y un cambio de escena
   const handleGiftAnimation = async (giftType: string) => {
@@ -78,8 +99,39 @@ export function Chat() {
       isAi: false,
     });
 
-    // 5. Reproducir respuesta de voz adorable
+    // 5. Trigger achievements engine
+    if (triggerAchievementCheck) {
+      triggerAchievementCheck("gift_received", 1);
+    }
+
+    // 6. Reproducir respuesta de voz adorable
     await speakText(voiceResponse, targetEmotion);
+  };
+
+  const handleQuickSaveState = async () => {
+    setSaveStatus("Guardando...");
+    const res = await saveStreamerFullState();
+    setSaveStatus(res.success ? "¡Guardado!" : "Error");
+    setTimeout(() => setSaveStatus(null), 3000);
+  };
+
+  const handleQuickLoadState = async () => {
+    setSaveStatus("Restaurando...");
+    const res = await loadStreamerFullState();
+    setSaveStatus(res.success ? "¡Restaurado!" : "Error");
+    setTimeout(() => setSaveStatus(null), 3000);
+  };
+
+  const handleTriggerSpecialPhrase = async () => {
+    if (!equippedRewards?.activeSpecialPhrase) return;
+    const phrase = equippedRewards.activeSpecialPhrase;
+    addMessage({
+      sender: "HECTRON (Miku)",
+      text: phrase,
+      emotion: "HAPPY",
+      isAi: true,
+    });
+    await speakText(phrase, "HAPPY");
   };
 
   const handleSend = async () => {
@@ -209,9 +261,34 @@ export function Chat() {
         <div className="flex items-center gap-2">
           <MessageSquare className="w-5 h-5 text-cyan-400" />
           <h2 className="text-lg font-bold text-white">💬 Chat de Transmisión</h2>
+          {equippedRewards?.activeTitle && (
+            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded font-bold">
+              <Award className="w-3 h-3 text-amber-400" />
+              {equippedRewards.activeTitle}
+            </span>
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          {/* Quick Persistence Controls */}
+          <button
+            onClick={handleQuickSaveState}
+            title="Guardar Estado del Streamer en Archivo Local / Servidor"
+            className="flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition cursor-pointer"
+          >
+            <Save className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">Guardar</span>
+          </button>
+
+          <button
+            onClick={handleQuickLoadState}
+            title="Restaurar Último Estado Guardado del Streamer"
+            className="flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">Restaurar</span>
+          </button>
+
           <button
             onClick={handleTriggerInitiative}
             disabled={loading}
@@ -232,6 +309,28 @@ export function Chat() {
           )}
         </div>
       </div>
+
+      {saveStatus && (
+        <div className="bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 px-3 py-1.5 rounded text-xs flex items-center justify-between">
+          <span>{saveStatus}</span>
+        </div>
+      )}
+
+      {/* Special Phrase Quick Trigger */}
+      {equippedRewards?.activeSpecialPhrase && (
+        <div className="bg-gradient-to-r from-purple-950/40 to-cyan-950/40 border border-purple-500/30 px-3 py-1.5 rounded-lg flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2 text-purple-300 truncate">
+            <Flame className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+            <span className="truncate font-medium">Frase Especial: "{equippedRewards.activeSpecialPhrase}"</span>
+          </div>
+          <button
+            onClick={handleTriggerSpecialPhrase}
+            className="px-2 py-0.5 bg-purple-600 hover:bg-purple-500 text-white rounded text-[11px] font-bold cursor-pointer transition shrink-0 ml-2"
+          >
+            Decir Frase 🎤
+          </button>
+        </div>
+      )}
 
       {/* TikTok Connect Banner if not connected */}
       {!tiktokConnected && (

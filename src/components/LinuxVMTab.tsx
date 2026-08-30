@@ -34,6 +34,11 @@ import {
   FilePlus,
 } from "lucide-react";
 import { formatBytes } from "../lib/linux-types";
+import {
+  BaphometTransmissionNodeStudio,
+  BAPHOMET_INSTALL_SCRIPT,
+  BAPHOMET_START_SCRIPT,
+} from "./BaphometTransmissionNodeStudio";
 
 export interface MockFileSystemItem {
   id: string;
@@ -62,6 +67,86 @@ const INITIAL_MOCK_FILESYSTEM: MockFileSystemItem[] = [
   { id: "dir_emulated", name: "emulated", path: "/storage/emulated", type: "directory", size: 4096, permissions: "drwxr-xr-x", owner: "hectron", group: "hectron", modified: "2026-08-28 01:40" },
   { id: "dir_emulated_0", name: "0", path: "/storage/emulated/0", type: "directory", size: 4096, permissions: "drwxr-xr-x", owner: "hectron", group: "hectron", modified: "2026-08-28 01:40" },
   { id: "dir_hector_android", name: "Hector", path: "/storage/emulated/0/Hector", type: "directory", size: 4096, permissions: "drwxr-xr-x", owner: "hectron", group: "hectron", modified: "2026-08-28 01:48" },
+  { id: "dir_hectron_home", name: "HECTRON", path: "/home/hectron/HECTRON", type: "directory", size: 4096, permissions: "drwxr-xr-x", owner: "hectron", group: "hectron", modified: "2026-08-30 01:40" },
+  { id: "dir_hectron_logs", name: "logs", path: "/home/hectron/HECTRON/logs", type: "directory", size: 4096, permissions: "drwxr-xr-x", owner: "hectron", group: "hectron", modified: "2026-08-30 01:40" },
+  { id: "dir_hectron_transmision", name: "transmision", path: "/home/hectron/HECTRON/transmision", type: "directory", size: 4096, permissions: "drwxr-xr-x", owner: "hectron", group: "hectron", modified: "2026-08-30 01:40" },
+
+  // Sovereign Transmission Node Files
+  {
+    id: "file_install_transmission_node",
+    name: "install_transmission_node.sh",
+    path: "/home/hectron/HECTRON/install_transmission_node.sh",
+    type: "file",
+    size: 3480,
+    permissions: "-rwxr-xr-x",
+    owner: "hectron",
+    group: "hectron",
+    modified: "2026-08-30 01:40",
+    isExecutable: true,
+    content: BAPHOMET_INSTALL_SCRIPT,
+  },
+  {
+    id: "file_install_transmission_applet",
+    name: "install_transmission.sh",
+    path: "/app/applet/install_transmission.sh",
+    type: "file",
+    size: 3480,
+    permissions: "-rwxr-xr-x",
+    owner: "hectron",
+    group: "hectron",
+    modified: "2026-08-30 01:40",
+    isExecutable: true,
+    content: BAPHOMET_INSTALL_SCRIPT,
+  },
+  {
+    id: "file_start_transmision_sh",
+    name: "start_transmision.sh",
+    path: "/home/hectron/HECTRON/transmision/start_transmision.sh",
+    type: "file",
+    size: 960,
+    permissions: "-rwxr-xr-x",
+    owner: "hectron",
+    group: "hectron",
+    modified: "2026-08-30 01:40",
+    isExecutable: true,
+    content: BAPHOMET_START_SCRIPT,
+  },
+  {
+    id: "file_connector_package_json",
+    name: "package.json",
+    path: "/home/hectron/HECTRON/transmision/package.json",
+    type: "file",
+    size: 280,
+    permissions: "-rw-r--r--",
+    owner: "hectron",
+    group: "hectron",
+    modified: "2026-08-30 01:40",
+    content: `{\n  "name": "hectron-transmission-connector",\n  "version": "1.0.0",\n  "description": "Conector asíncrono de baja latencia para transmisiones en vivo",\n  "main": "index.js",\n  "scripts": {\n    "start": "node index.js"\n  },\n  "dependencies": {\n    "tiktok-live-connector": "^1.2.0",\n    "ws": "^8.18.0"\n  }\n}`,
+  },
+  {
+    id: "file_connector_index_js",
+    name: "index.js",
+    path: "/home/hectron/HECTRON/transmision/index.js",
+    type: "file",
+    size: 1450,
+    permissions: "-rw-r--r--",
+    owner: "hectron",
+    group: "hectron",
+    modified: "2026-08-30 01:40",
+    content: `const { WebcastPushConnection } = require('tiktok-live-connector');\nconst WebSocket = require('ws');\n\nconst wss = new WebSocket.Server({ port: 8181 });\nconsole.log('[HECTRON NODO BAPHOMET] Servidor WebSocket activo en puerto 8181');\n\nwss.on('connection', (ws) => {\n  console.log('[OBS-CLIENT] Conectado a la canalización en vivo.');\n});`,
+  },
+  {
+    id: "file_transmission_connector_log",
+    name: "transmission_connector.log",
+    path: "/home/hectron/HECTRON/logs/transmission_connector.log",
+    type: "file",
+    size: 2120,
+    permissions: "-rw-r--r--",
+    owner: "hectron",
+    group: "hectron",
+    modified: "2026-08-30 01:42",
+    content: `[2026-08-30 01:40:00] [INFO] HECTRON-Ψ Orquestador Baphomet iniciado.\n[2026-08-30 01:40:02] [INFO] Frecuencia de transmisión bloqueada en 666.9 MHz.\n[2026-08-30 01:40:05] [INFO] TikTokLive Webcast Socket conectado a @lopez_hector140998.\n[2026-08-30 01:41:00] [STREAMING] Flujo de audio y telemetría transmitiéndose a OBS Studio.`,
+  },
 
   // Files in /app/applet
   {
@@ -162,7 +247,7 @@ interface TerminalEntry {
 }
 
 export function LinuxVMTab() {
-  const [activeSubTab, setActiveSubTab] = useState<"xterm" | "explorer" | "hardware" | "quicktools">("xterm");
+  const [activeSubTab, setActiveSubTab] = useState<"xterm" | "explorer" | "hardware" | "baphomet" | "quicktools">("xterm");
   const [currentCwd, setCurrentCwd] = useState<string>("/app/applet");
   const [commandInput, setCommandInput] = useState<string>("");
   const [history, setHistory] = useState<TerminalEntry[]>([
@@ -667,6 +752,18 @@ hectron   1140  0.0  0.1  12480  4120 pts/0    R+   01:50   0:00 ps aux`;
               <Cpu className="w-4 h-4" />
               <span>Hardware & Procesos</span>
             </button>
+
+            <button
+              onClick={() => setActiveSubTab("baphomet")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                activeSubTab === "baphomet"
+                  ? "bg-gradient-to-r from-cyan-500 to-amber-500 text-slate-950 shadow-md shadow-cyan-500/20 font-black"
+                  : "bg-slate-950 text-amber-300 hover:bg-slate-800 border border-amber-500/30"
+              }`}
+            >
+              <Zap className="w-4 h-4 text-amber-400" />
+              <span>⚡ Nodo Baphomet (vΩ+12.1)</span>
+            </button>
           </div>
 
           {activeSubTab === "xterm" && (
@@ -698,6 +795,8 @@ hectron   1140  0.0  0.1  12480  4120 pts/0    R+   01:50   0:00 ps aux`;
             </span>
             <div className="flex items-center gap-1.5">
               {[
+                { label: "⚡ bash install_transmission.sh", cmd: "bash install_transmission.sh" },
+                { label: "▶ ./start_transmision.sh", cmd: "./start_transmision.sh" },
                 { label: "neofetch", cmd: "neofetch" },
                 { label: "df -h", cmd: "df -h" },
                 { label: "free -m", cmd: "free -m" },
@@ -1042,6 +1141,16 @@ hectron   1140  0.0  0.1  12480  4120 pts/0    R+   01:50   0:00 ps aux`;
             </div>
           </div>
         </div>
+      )}
+
+      {/* VIEW 4: HECTRON-Ψ BAPHOMET LIVE TRANSMISSION NODE STUDIO */}
+      {activeSubTab === "baphomet" && (
+        <BaphometTransmissionNodeStudio
+          onRunInTerminal={(cmd) => {
+            setActiveSubTab("xterm");
+            executeCommand(cmd);
+          }}
+        />
       )}
 
       {/* MODAL: File Viewer & Code Editor */}

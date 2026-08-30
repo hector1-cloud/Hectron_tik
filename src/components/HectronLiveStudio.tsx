@@ -46,6 +46,7 @@ import {
   X,
   Info,
 } from "lucide-react";
+import { BaphometTransmissionNodeStudio } from "./BaphometTransmissionNodeStudio";
 
 // --- UTILS & REGEX ---
 const TIKTOK_URL_REGEX = /^(https?:\/\/)?(www\.)?(tiktok\.com|vm\.tiktok\.com)\/.*$/i;
@@ -1254,7 +1255,7 @@ const LiveBotView: React.FC<{ addToast: (msg: string, type?: Toast["type"]) => v
 // --- MAIN HECTRON LIVE STUDIO COMPONENT ---
 
 export const HectronLiveStudio: React.FC = () => {
-  const [activeSubTab, setActiveSubTab] = useState<"live" | "downloader" | "analyzer" | "automation">("live");
+  const [activeSubTab, setActiveSubTab] = useState<"live" | "downloader" | "analyzer" | "automation" | "baphomet">("live");
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const addToast = (message: string, type: Toast["type"] = "info") => {
@@ -1357,6 +1358,19 @@ export const HectronLiveStudio: React.FC = () => {
             <Zap className="w-4 h-4 text-amber-300" />
             <span>Núcleo de Automatización</span>
           </button>
+
+          <button
+            id="subtab-baphomet"
+            onClick={() => setActiveSubTab("baphomet")}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+              activeSubTab === "baphomet"
+                ? "bg-gradient-to-r from-cyan-500 to-amber-500 text-slate-950 shadow-lg shadow-cyan-500/20 font-black"
+                : "text-amber-300 hover:text-amber-100"
+            }`}
+          >
+            <Radio className="w-4 h-4 text-amber-400" />
+            <span>⚡ Nodo Baphomet (vΩ+12.1)</span>
+          </button>
         </div>
 
         <div className="hidden md:flex items-center gap-2 pr-2 text-xs font-medium text-slate-400">
@@ -1371,6 +1385,7 @@ export const HectronLiveStudio: React.FC = () => {
         {activeSubTab === "downloader" && <DownloaderView addToast={addToast} />}
         {activeSubTab === "analyzer" && <AnalyzerView addToast={addToast} />}
         {activeSubTab === "automation" && <AutomationView addToast={addToast} />}
+        {activeSubTab === "baphomet" && <BaphometTransmissionNodeStudio />}
       </div>
     </div>
   );

@@ -25,6 +25,9 @@ import ExecutiveGuide from "./components/ExecutiveGuide";
 import { InventoryMenu } from "./components/InventoryMenu";
 import { SaveLoadManager } from "./components/SaveLoadManager";
 import { GameWorldView } from "./components/GameWorldView";
+import { AchievementsStudio } from "./components/AchievementsStudio";
+import { UserProfileStudio } from "./components/UserProfileStudio";
+import { AudienceEngagementStudio } from "./components/AudienceEngagementStudio";
 import { StartupHealthCheck } from "./components/StartupHealthCheck";
 import { GeminiTtsVoiceSettingsCard } from "./components/GeminiTtsVoiceSettingsCard";
 import { VoiceCommanderCard } from "./components/VoiceCommanderCard";
@@ -80,6 +83,9 @@ import {
   QrCode,
   BellRing,
   X,
+  Trophy,
+  Award,
+  RotateCcw,
 } from "lucide-react";
 
 const downloadImageAsPDF = async (imageSrc: string, pdfFileName: string) => {
@@ -536,8 +542,14 @@ export default function App() {
     latestSpeechText,
     isSpeaking,
     gameState,
+    messages,
     isAutoSaving,
     lastAutoSaveTime,
+    achievements,
+    latestUnlockedAchievement,
+    dismissUnlockedAchievementToast,
+    streamerStateRestoredNotice,
+    dismissStreamerRestoredNotice,
   } = useContext(BrainContext);
 
   const { user, saveActiveTab, switchRole, presetProfiles } = useAuth();
@@ -961,6 +973,42 @@ export default function App() {
             </button>
 
             <button
+              onClick={() => setActiveTab("engagement")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                activeTab === "engagement"
+                  ? "bg-gradient-to-r from-purple-500 to-pink-500 text-slate-950 shadow-md shadow-purple-500/20 font-extrabold"
+                  : "text-purple-300 hover:text-white"
+              }`}
+            >
+              <Sparkles className="w-4 h-4 text-purple-400" />
+              <span>Engagement & Audiencia</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("profiles")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                activeTab === "profiles"
+                  ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-950 shadow-md shadow-cyan-500/20 font-extrabold"
+                  : "text-cyan-300 hover:text-white"
+              }`}
+            >
+              <User className="w-4 h-4 text-cyan-400" />
+              <span>Perfiles & Personalización</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("achievements" as any)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                (activeTab as string) === "achievements"
+                  ? "bg-gradient-to-r from-amber-500 to-cyan-500 text-slate-950 shadow-md shadow-amber-500/20 font-extrabold"
+                  : "text-amber-300 hover:text-white"
+              }`}
+            >
+              <Trophy className="w-4 h-4 text-amber-400" />
+              <span>Logros & Recompensas</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab("executive")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 activeTab === "executive"
@@ -975,6 +1023,18 @@ export default function App() {
 
           {/* Status Badges */}
           <div className="flex items-center gap-2">
+            {/* Achievements Chip */}
+            <button
+              onClick={() => setActiveTab("achievements" as any)}
+              className="flex items-center gap-1.5 bg-slate-950 px-3 py-1 rounded-full text-xs font-bold text-amber-300 border border-amber-500/40 hover:border-amber-400 transition cursor-pointer"
+              title="Abrir Sistema de Logros y Recompensas"
+            >
+              <Trophy className="w-3.5 h-3.5 text-amber-400" />
+              <span>
+                {achievements ? achievements.filter((a) => a.unlocked).length : 0}/{achievements ? achievements.length : 0} 🏆
+              </span>
+            </button>
+
             {/* CyberCoins Chip */}
             <button
               onClick={() => setActiveTab("inventory")}
@@ -1190,9 +1250,21 @@ export default function App() {
                     ))}
                   </div>
 
-                  <div className="mt-2.5 pt-2 border-t border-slate-800 flex justify-between items-center text-[10px] text-slate-400 px-1">
-                    <span>Persistencia Local: Activa</span>
-                    <span className="font-mono text-emerald-400">● Conectado</span>
+                  <div className="mt-2.5 pt-2 border-t border-slate-800 space-y-2">
+                    <button
+                      onClick={() => {
+                        setActiveTab("profiles");
+                        setIsProfileModalOpen(false);
+                      }}
+                      className="w-full py-1.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 rounded-lg text-xs font-black transition cursor-pointer flex items-center justify-center gap-1.5 shadow"
+                    >
+                      <User className="w-3.5 h-3.5" />
+                      <span>Abrir Estudio de Perfiles & 3D</span>
+                    </button>
+                    <div className="flex justify-between items-center text-[10px] text-slate-400 px-1">
+                      <span>Persistencia Local: Activa</span>
+                      <span className="font-mono text-emerald-400">● Conectado</span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1248,6 +1320,91 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {/* Streamer State Restored Notification Banner */}
+        {streamerStateRestoredNotice && (
+          <div className="animate-fadeIn bg-gradient-to-r from-cyan-950 via-slate-900 to-cyan-950 border border-cyan-500/60 rounded-2xl p-4 shadow-xl flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-cyan-500/20 text-cyan-400 rounded-xl border border-cyan-500/30 shrink-0">
+                <RotateCcw className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-white flex items-center gap-2">
+                  <span>✨ Sesión del Streamer Restaurada con Éxito</span>
+                  <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-500/30">
+                    Emoción: {emotion} | Escena: {obsStatus.scene}
+                  </span>
+                </p>
+                <p className="text-[11px] text-slate-300 mt-0.5">
+                  El estado del streamer virtual (emociones, escena activa, {messages.length} mensajes en chat y recompensas) fue cargado desde el almacenamiento persistente.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={dismissStreamerRestoredNotice}
+              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer shrink-0"
+              title="Cerrar"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Global Achievement Unlocked Celebration Toast */}
+        {latestUnlockedAchievement && (
+          <div className="animate-bounce-short bg-gradient-to-r from-amber-950 via-slate-900 to-amber-950 border-2 border-amber-400/90 rounded-2xl p-4 sm:p-5 shadow-2xl shadow-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-amber-500/50 shrink-0">
+                <Trophy className="w-7 h-7" />
+              </div>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm sm:text-base font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                    🎉 ¡LOGRO DESBLOQUEADO!
+                  </span>
+                  <span className="px-2.5 py-0.5 bg-amber-500/20 text-amber-300 font-mono text-xs font-bold rounded-full border border-amber-500/40">
+                    +{latestUnlockedAchievement.xpReward} XP
+                  </span>
+                </div>
+                <p className="text-xs text-slate-200">
+                  <strong className="text-amber-300 font-bold">{latestUnlockedAchievement.title}</strong>: {latestUnlockedAchievement.description}
+                </p>
+                <p className="text-[11px] text-amber-400 font-semibold">
+                  🎁 Recompensa: {latestUnlockedAchievement.reward.name} ({latestUnlockedAchievement.reward.description})
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 self-end sm:self-center shrink-0">
+              <button
+                onClick={() => {
+                  setActiveTab("achievements" as any);
+                  dismissUnlockedAchievementToast();
+                }}
+                className="px-4 py-2 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 rounded-xl text-xs font-black shadow-lg shadow-amber-500/30 transition cursor-pointer flex items-center gap-1.5"
+              >
+                <Award className="w-4 h-4" />
+                <span>Ver y Reclamar Recompensas</span>
+              </button>
+              <button
+                onClick={dismissUnlockedAchievementToast}
+                className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition cursor-pointer"
+                title="Cerrar notificación"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* User Profiles & Customization Studio Tab */}
+        {activeTab === "profiles" && <UserProfileStudio />}
+
+        {/* Audience Interactive Engagement Studio Tab */}
+        {activeTab === "engagement" && <AudienceEngagementStudio />}
+
+        {/* Achievements & Rewards Studio Tab */}
+        {activeTab === "achievements" && <AchievementsStudio />}
 
         {/* Game World & Exploration Tab */}
         {activeTab === "game" && <GameWorldView />}

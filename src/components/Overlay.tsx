@@ -1,4 +1,4 @@
-import { useContext, useState, useEffect } from "react";
+import { useContext, useState, useEffect, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import { BrainContext } from "../BrainContext";
 import { HectronCloud } from "./HectronCloud";
@@ -15,6 +15,7 @@ import {
   Battery,
   Layers,
   Award,
+  Trophy,
 } from "lucide-react";
 
 export function Overlay() {
@@ -29,6 +30,7 @@ export function Overlay() {
     setActiveTab,
     isAutoSaving,
     lastAutoSaveTime,
+    equippedRewards,
   } = useContext(BrainContext);
   const [transitioning, setTransitioning] = useState(false);
 
@@ -42,6 +44,24 @@ export function Overlay() {
 
   const activeSpawnCount = gameState.worldSpawnedItems.filter((i) => !i.collected).length;
 
+  const auraColor = useMemo(() => {
+    switch (equippedRewards?.activeVisualEffect) {
+      case "GOLDEN_GLOW":
+        return "#fbbf24";
+      case "PRISMATIC_RAINBOW":
+        return "#ec4899";
+      case "VOID_PULSE":
+        return "#a855f7";
+      case "EMBER_FLAME":
+        return "#f97316";
+      case "STARLIGHT_SPARKLES":
+        return "#38bdf8";
+      case "CYAN_NEON":
+      default:
+        return "#00ffff";
+    }
+  }, [equippedRewards?.activeVisualEffect]);
+
   return (
     <div className="relative w-full h-screen bg-slate-950/90 overflow-hidden select-none font-sans">
       {/* 3D Canvas Background & Character */}
@@ -53,13 +73,13 @@ export function Overlay() {
         >
           <color attach="background" args={["#0a0e1a"]} />
 
-          {/* Ambient Lighting */}
-          <ambientLight intensity={0.6} color="#00e1ff" />
+          {/* Ambient Lighting tuned to equipped aura */}
+          <ambientLight intensity={0.65} color={auraColor} />
 
-          {/* FX Layer */}
-          <Particles count={450} color="#00ffff" />
-          <Glow color="#00ffff" intensity={1.4} position={[0, 2, 0]} />
-          <TransitionEffect active={transitioning} color="#00ffff" />
+          {/* FX Layer with aura color */}
+          <Particles count={480} color={auraColor} />
+          <Glow color={auraColor} intensity={1.5} position={[0, 2, 0]} />
+          <TransitionEffect active={transitioning} color={auraColor} />
           <Bubbles emotion={emotion} count={18} />
 
           {/* 3D Interactive Collectible World Items */}
@@ -78,11 +98,27 @@ export function Overlay() {
         <div className="flex items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-cyan-500/30 px-4 py-2 rounded-full shadow-lg shadow-cyan-500/10 pointer-events-auto">
           <div className="w-3 h-3 rounded-full bg-cyan-400 animate-pulse" />
           <span className="text-cyan-300 font-bold tracking-wider text-sm">HECTRON STREAMER STUDIO</span>
+          {equippedRewards?.activeTitle && (
+            <span className="text-xs text-amber-300 border-l border-slate-700 pl-2 font-semibold flex items-center gap-1">
+              <Award className="w-3 h-3 text-amber-400" />
+              {equippedRewards.activeTitle}
+            </span>
+          )}
           <span className="text-xs text-slate-400 border-l border-slate-700 pl-2">Nivel {gameState.player.level}</span>
         </div>
 
         {/* Game Stats & Quick Navigation in 3D Mode */}
         <div className="flex items-center gap-2 pointer-events-auto">
+          {/* Quick Achievements Button */}
+          <button
+            onClick={() => setActiveTab("achievements" as any)}
+            className="flex items-center gap-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 text-xs font-bold px-3 py-1.5 rounded-full shadow-lg transition cursor-pointer"
+            title="Ver Logros & Recompensas"
+          >
+            <Trophy className="w-3.5 h-3.5 text-amber-400" />
+            <span>Logros</span>
+          </button>
+
           {/* CyberCoins Chip */}
           <div className="flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-md border border-amber-500/40 px-3 py-1.5 rounded-full text-amber-300 text-xs font-bold shadow-lg">
             <Coins className="w-3.5 h-3.5 text-amber-400" />

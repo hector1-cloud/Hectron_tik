@@ -115,6 +115,77 @@ export function executeMockBashCommand(
     };
   }
 
+  // Handle HECTRON-Ψ Transmission scripts
+  if (
+    trimmed === "bash install_transmission.sh" ||
+    trimmed === "./install_transmission.sh" ||
+    trimmed === "bash install_transmission_node.sh" ||
+    trimmed === "./install_transmission_node.sh" ||
+    trimmed === "sh install_transmission.sh" ||
+    trimmed === "baphomet" ||
+    trimmed === "node-baphomet"
+  ) {
+    return {
+      stdout: `    ██╗  ██╗███████╗ ██████╗████████╗██████╗  ██████╗ ███╗   ██╗-Ψ
+    ██║  ██║██╔════╝██╔════╝╚══██╔══╝██╔══██╗██╔═══██╗████╗  ██║
+    ███████║█████╗  ██║        ██║   ██████╔╝██║   ██║██╔██╗ ██║
+    ██╔══██║██╔══╝  ██║        ██║   ██╔══██╗██║   ██║██║╚██╗██║
+    ██║  ██║███████╗╚██████╗   ██║   ██║  ██║╚██████╔╝██║ ╚████║
+    ╚═╝  ╚═╝╚══════╝ ╚═════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝
+               --- SCRIPT DE INSTALACIÓN DE TRANSMISIÓN ---
+                    CIUDAD ACUÑA // COAHUILA // MEXICO
+
+[*] Configurando infraestructura de directorios...
+[*] Creando /home/hectron/HECTRON/logs y /home/hectron/HECTRON/transmision...
+[*] Analizando sistema operativo y dependencias base...
+[✔] Entorno Linux estándar detectado.
+[*] Instalando dependencias mediante apt: python3 python3-pip python3-venv nodejs npm git ffmpeg mpv...
+[*] Forjando entorno virtual aislado 'baphomet_venv'...
+[*] Activando virtualenv e instalando librerías requeridas...
+[*] Instalando dependencias de Python (Inferencia local, WebSockets, gTTS y TikTokLive)...
+Successfully installed requests-2.31.0 fastapi-0.110.0 uvicorn-0.28.0 websockets-12.0 pydantic-2.6.4 gTTS-2.5.1 TikTokLive-6.1.4 python-dotenv-1.0.1
+[*] Configurando conector web y WebSocket de Node.js en /home/hectron/HECTRON/transmision...
+[*] Instalando tiktok-live-connector y ws...
+added 24 packages, and audited 25 packages in 1.4s
+[*] Generando script de lanzamiento de transmisión 'start_transmision.sh'...
+[✔] Permisos chmod +x asignados a start_transmision.sh
+
+========================================================
+    ¡ENTORNO DE TRANSMISIÓN INSTALADO CON ÉXITO!     
+========================================================
+La infraestructura táctica de transmisión ha sido configurada en:
+📁 /home/hectron/HECTRON/transmision
+
+Para activar el entorno virtual y lanzar tu transmisión ejecuta:
+👉 cd /home/hectron/HECTRON/transmision && ./start_transmision.sh
+
+Soberanía absoluta // Canal listo para transmisión en vivo.`,
+      stderr: "",
+      exitCode: 0,
+      timeMs: 120,
+    };
+  }
+
+  if (
+    trimmed === "./start_transmision.sh" ||
+    trimmed === "start_transmision.sh" ||
+    trimmed === "bash start_transmision.sh" ||
+    trimmed === "cd ~/HECTRON/transmision && ./start_transmision.sh"
+  ) {
+    return {
+      stdout: `[⚡] Despertando Orquestador de Transmisión...
+[*] Entorno virtual /home/hectron/HECTRON/baphomet_venv activado.
+[✔] Servidor de audio PulseAudio verificado.
+[✔] Conector WebSocket Node.js de TikTok Live inicializado en puerto 8181.
+[✔] Entorno activo. Ejecutando canalización de WebSockets hacia OBS Studio (Port 4455)...
+Frecuencia de transmisión bloqueada en 666.9 MHz.
+[LIVE STREAMING READY] Enjambre Baphomet transmitiendo paquetes en tiempo real.`,
+      stderr: "",
+      exitCode: 0,
+      timeMs: 45,
+    };
+  }
+
   // Handle uname
   if (trimmed.startsWith("uname")) {
     if (trimmed.includes("-r")) {

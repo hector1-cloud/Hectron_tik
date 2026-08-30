@@ -3,6 +3,7 @@ import {
   BrainContextType,
   Emotion,
   AvatarAnimationClass,
+  AuraEffect,
   ObsStatus,
   ChatMessage,
   LogEntry,
@@ -15,6 +16,8 @@ import {
 import { useGeminiTtsEmotion } from "./hooks/useGeminiTtsEmotion";
 import { useGameState } from "./hooks/useGameState";
 import { useWebSocketReconnection } from "./hooks/useWebSocketReconnection";
+import { useAchievements } from "./hooks/useAchievements";
+import { useStreamerStatePersistence } from "./hooks/useStreamerStatePersistence";
 
 export const DEFAULT_TTS_VOICE_SETTINGS: TtsVoiceSettings = {
   voice: "Kore",
@@ -46,7 +49,32 @@ export function BrainProvider({ children }: { children: ReactNode }) {
 
   const [isAutonomous, setIsAutonomous] = useState<boolean>(true);
   const [tiktokConnected, setTiktokConnected] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "game" | "inventory" | "saves" | "overlay" | "agent" | "tiktok" | "duix" | "streamerbot" | "logs" | "performance" | "autonomy" | "workers-ai" | "workflows" | "executive" | "enterprise" | "sims" | "livestudio" | "linux" | "studio3d" | "analytics">("dashboard");
+  const [activeTab, setActiveTab] = useState<
+    | "dashboard"
+    | "game"
+    | "inventory"
+    | "saves"
+    | "achievements"
+    | "profiles"
+    | "engagement"
+    | "overlay"
+    | "agent"
+    | "tiktok"
+    | "duix"
+    | "streamerbot"
+    | "logs"
+    | "performance"
+    | "autonomy"
+    | "workers-ai"
+    | "workflows"
+    | "executive"
+    | "enterprise"
+    | "sims"
+    | "livestudio"
+    | "linux"
+    | "studio3d"
+    | "analytics"
+  >("dashboard");
 
   // LOD & FPS state for 3D optimization
   const [lodLevel, setLodLevel] = useState<"HIGH" | "MEDIUM" | "LOW">("HIGH");
@@ -142,6 +170,55 @@ export function BrainProvider({ children }: { children: ReactNode }) {
     soundEffect,
   } = useGameState(obsStatus.scene, emotion, setEmotion, addLog);
 
+  // Connect Achievements & Rewards Hook
+  const {
+    achievements,
+    equippedRewards,
+    triggerAchievementCheck,
+    claimAchievementReward,
+    equipRewardAnimation,
+    equipRewardVisualEffect,
+    equipRewardSpecialPhrase,
+    equipRewardTitle,
+    latestUnlockedAchievement,
+    dismissUnlockedAchievementToast,
+  } = useAchievements(gainExperience, gainCoins, addLog);
+
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: "1",
+      sender: "HECTRON (Miku)",
+      text: "¡Hola a todos! Bienvenidos al directo. Soy Miku y estoy lista para platicar con ustedes. 🎤💙",
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      emotion: "HAPPY",
+      isAi: true,
+    },
+  ]);
+
+  // Connect Full Streamer State Persistence & Restoration Hook (Emotions, Scenes, Chat History, Autonomy)
+  const {
+    saveStreamerFullState,
+    loadStreamerFullState,
+    resetStreamerFullState,
+    exportStreamerStateJSON,
+    importStreamerStateJSON,
+    streamerStateRestoredNotice,
+    dismissStreamerRestoredNotice,
+  } = useStreamerStatePersistence(
+    emotion,
+    setEmotion,
+    obsStatus.scene,
+    (scene: string) => setObsStatus((prev) => ({ ...prev, scene })),
+    messages,
+    setMessages,
+    isAutonomous,
+    setIsAutonomous,
+    ttsVoiceSettings,
+    setTtsVoiceSettings,
+    equippedRewards,
+    addLog
+  );
+
   // Poll server logs periodically
   useEffect(() => {
     const fetchServerLogs = async () => {
@@ -184,16 +261,13 @@ export function BrainProvider({ children }: { children: ReactNode }) {
     return () => cancelAnimationFrame(animationId);
   }, []);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "1",
-      sender: "HECTRON (Miku)",
-      text: "¡Hola a todos! Bienvenidos al directo. Soy Miku y estoy lista para platicar con ustedes. 🎤💙",
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      emotion: "HAPPY",
-      isAi: true,
-    },
-  ]);
+  // Stream Time Tick Loop for Achievements (tracks active on-air time)
+  useEffect(() => {
+    const streamTickTimer = setInterval(() => {
+      triggerAchievementCheck("stream_tick", 5);
+    }, 5000);
+    return () => clearInterval(streamTickTimer);
+  }, [triggerAchievementCheck]);
 
   const [latestSpeechText, setLatestSpeechText] = useState<string>("¡Hola a todos! Bienvenidos al directo.");
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
@@ -204,10 +278,16 @@ export function BrainProvider({ children }: { children: ReactNode }) {
       id: Math.random().toString(36).substring(2, 9),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
-    setMessages((prev) => [...prev.slice(-30), newMsg]);
+    setMessages((prev) => [...prev.slice(-50), newMsg]);
     if (msg.isAi) {
       setLatestSpeechText(msg.text);
     }
+    // Check achievements
+    triggerAchievementCheck("chat_sent", 1);
+  };
+
+  const clearMessages = () => {
+    setMessages([]);
   };
 
   // Check Local Agent Health
@@ -538,6 +618,9 @@ export function BrainProvider({ children }: { children: ReactNode }) {
     } else {
       setTimeout(() => setIsSpeaking(false), 2500);
     }
+
+    // Trigger achievement check for TTS voice synthesis
+    triggerAchievementCheck("tts_spoken", 1);
   };
 
   return (
@@ -562,6 +645,7 @@ export function BrainProvider({ children }: { children: ReactNode }) {
         setTiktokConnected,
         messages,
         addMessage,
+        clearMessages,
         activeTab,
         setActiveTab,
         speakText,
@@ -596,6 +680,23 @@ export function BrainProvider({ children }: { children: ReactNode }) {
         gainExperience,
         gainCoins,
         soundEffect,
+        saveStreamerFullState,
+        loadStreamerFullState,
+        resetStreamerFullState,
+        exportStreamerStateJSON,
+        importStreamerStateJSON,
+        streamerStateRestoredNotice,
+        dismissStreamerRestoredNotice,
+        achievements,
+        claimAchievementReward,
+        equipRewardAnimation,
+        equipRewardVisualEffect,
+        equipRewardSpecialPhrase,
+        equipRewardTitle,
+        equippedRewards,
+        triggerAchievementCheck,
+        latestUnlockedAchievement,
+        dismissUnlockedAchievementToast,
       }}
     >
       {children}

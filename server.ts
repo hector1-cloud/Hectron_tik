@@ -1,6 +1,7 @@
 import express from "express";
 import http from "http";
 import path from "path";
+import fs from "fs";
 import cors from "cors";
 import dotenv from "dotenv";
 import crypto from "crypto";
@@ -750,6 +751,196 @@ INSTRUCCIONES CRÍTICAS:
   } catch (error: any) {
     addServerLog("ERROR", "SERVER", "Chat endpoint exception", { error: error?.message });
     res.status(500).json({ error: error?.message || "Internal chat error" });
+  }
+});
+
+// =========================================================================
+// VIRTUAL STREAMER STATE PERSISTENCE & RESTORATION ENGINE (Local File & DB)
+// =========================================================================
+const DATA_DIR = path.join(process.cwd(), "data");
+const STREAMER_STATE_FILE = path.join(DATA_DIR, "streamer_state.json");
+const ACHIEVEMENTS_STATE_FILE = path.join(DATA_DIR, "achievements_state.json");
+
+// Ensure data directory exists
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+} catch (e) {
+  console.warn("Could not create data directory", e);
+}
+
+// Default initial state
+const DEFAULT_STREAMER_STATE = {
+  version: 1,
+  timestamp: new Date().toISOString(),
+  emotion: "HAPPY",
+  activeScene: "DEFAULT",
+  chatHistory: [
+    {
+      id: "init_miku_1",
+      sender: "HECTRON (Miku)",
+      text: "¡Hola a todos! Bienvenidos al directo. Soy Miku y estoy lista para platicar con ustedes. 🎤💙",
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      emotion: "HAPPY",
+      isAi: true,
+    },
+  ],
+  isAutonomous: true,
+  isStreaming: false,
+  tiktokConnected: false,
+  ttsVoiceSettings: {
+    voice: "Kore",
+    speakingRate: 1.05,
+    pitch: 1.1,
+    expressiveness: "cheerful",
+    autoSpeechEnabled: true,
+  },
+  streamStats: {
+    totalViewersServed: 1240,
+    giftsReceivedCount: 18,
+    itemsCollectedCount: 4,
+    questsCompletedCount: 2,
+    totalChatMessages: 1,
+    minutesStreamed: 12,
+    totalLikes: 350,
+    hypeMultiplier: 1.2,
+  },
+  equippedRewards: {
+    activeAnimation: "happy",
+    activeSpecialPhrase: "¡Saludos a todos los ciber-viajeros! Gracias por la energía estelar. 💙✨",
+    activeVisualEffect: "CYAN_NEON",
+    activeTitle: "🌟 Streamer Holográfica Prime",
+    activeBadge: "badge_founder",
+  },
+  unlockedAchievementIds: ["chat_first_message"],
+  claimedRewardIds: ["phrase_greeting_legend"],
+};
+
+// In-Memory cache initialized from file if available
+let cachedStreamerState: any = null;
+try {
+  if (fs.existsSync(STREAMER_STATE_FILE)) {
+    const raw = fs.readFileSync(STREAMER_STATE_FILE, "utf-8");
+    cachedStreamerState = JSON.parse(raw);
+    addServerLog("INFO", "SERVER", "Estado del streamer virtual restaurado con éxito desde archivo local.");
+  }
+} catch (err: any) {
+  console.warn("Failed loading initial streamer state file:", err);
+}
+
+// In-Memory achievements state
+let cachedAchievementsState: any = null;
+try {
+  if (fs.existsSync(ACHIEVEMENTS_STATE_FILE)) {
+    const raw = fs.readFileSync(ACHIEVEMENTS_STATE_FILE, "utf-8");
+    cachedAchievementsState = JSON.parse(raw);
+  }
+} catch (err: any) {
+  console.warn("Failed loading achievements file:", err);
+}
+
+// 1. GET current saved streamer state
+app.get("/api/streamer/state", (_req, res) => {
+  if (cachedStreamerState) {
+    return res.json({
+      success: true,
+      state: cachedStreamerState,
+      source: "disk_cache",
+      timestamp: cachedStreamerState.timestamp,
+    });
+  }
+  return res.json({
+    success: true,
+    state: DEFAULT_STREAMER_STATE,
+    source: "default",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// 2. POST save current streamer state
+app.post("/api/streamer/state", (req, res) => {
+  try {
+    const statePayload = req.body?.state || req.body;
+    if (!statePayload || typeof statePayload !== "object") {
+      return res.status(400).json({ success: false, error: "Payload de estado inválido" });
+    }
+
+    const stateToSave = {
+      ...DEFAULT_STREAMER_STATE,
+      ...statePayload,
+      timestamp: new Date().toISOString(),
+    };
+
+    cachedStreamerState = stateToSave;
+
+    // Persist to local JSON file
+    fs.writeFileSync(STREAMER_STATE_FILE, JSON.stringify(stateToSave, null, 2), "utf-8");
+
+    addServerLog(
+      "INFO",
+      "SERVER",
+      `Estado del streamer virtual guardado: Emoción [${stateToSave.emotion}], Escena [${stateToSave.activeScene}], ${stateToSave.chatHistory?.length || 0} mensajes de chat`
+    );
+
+    // Notify connected frontend WebSocket clients
+    broadcast({
+      type: "streamer_state_saved",
+      state: stateToSave,
+    });
+
+    return res.json({
+      success: true,
+      message: "Estado del streamer virtual guardado exitosamente en archivo local y base de datos.",
+      timestamp: stateToSave.timestamp,
+    });
+  } catch (err: any) {
+    addServerLog("ERROR", "SERVER", "Error al guardar el estado del streamer", { error: err?.message });
+    return res.status(500).json({ success: false, error: err?.message || "Error al guardar" });
+  }
+});
+
+// 3. POST reset streamer state to clean defaults
+app.post("/api/streamer/state/reset", (_req, res) => {
+  try {
+    cachedStreamerState = { ...DEFAULT_STREAMER_STATE, timestamp: new Date().toISOString() };
+    if (fs.existsSync(STREAMER_STATE_FILE)) {
+      fs.unlinkSync(STREAMER_STATE_FILE);
+    }
+    addServerLog("INFO", "SERVER", "Estado del streamer virtual restablecido a los valores de fábrica.");
+    broadcast({
+      type: "streamer_state_reset",
+      state: cachedStreamerState,
+    });
+    return res.json({
+      success: true,
+      message: "Estado del streamer restablecido correctamente.",
+      state: cachedStreamerState,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+// 4. GET / POST Achievements state
+app.get("/api/streamer/achievements", (_req, res) => {
+  return res.json({
+    success: true,
+    achievements: cachedAchievementsState || null,
+  });
+});
+
+app.post("/api/streamer/achievements", (req, res) => {
+  try {
+    const { achievements } = req.body;
+    if (Array.isArray(achievements)) {
+      cachedAchievementsState = achievements;
+      fs.writeFileSync(ACHIEVEMENTS_STATE_FILE, JSON.stringify(achievements, null, 2), "utf-8");
+      return res.json({ success: true, message: "Logros sincronizados con el servidor" });
+    }
+    return res.status(400).json({ success: false, error: "Array de logros esperado" });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message });
   }
 });
 
