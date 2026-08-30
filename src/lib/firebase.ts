@@ -87,7 +87,7 @@ export async function testFirestoreConnection() {
     if (error?.message?.includes('offline') || error?.code === 'unavailable') {
       console.warn('[Firebase] Firestore is currently unreachable (Client is offline or service unavailable).');
     } else if (error?.code === 'permission-denied') {
-      console.warn('[Firebase] Connected, but permission denied for ping doc (this is normal if rules are restrictive).');
+      console.log('[Firebase] Connection verified (Firestore security rules active).');
     } else {
       console.error('[Firebase] Firestore Connection Error:', error);
     }

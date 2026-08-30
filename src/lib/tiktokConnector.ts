@@ -105,14 +105,17 @@ class TikTokLiveConnectorManager {
       this.addLog("INFO", "TIKTOK", `Iniciando solicitud de conexión a TikTok LIVE para @${username}...`);
     }
 
-    // Resolve signApiKey - ignore hardcoded expired demo keys to prevent EulerStream 402/403 business plan blocks
+    // Resolve signApiKey - using configured TikTok / EulerStream API Key
     const rawSignApiKey =
       options?.signApiKey?.trim() ||
+      process.env.TIKTOK_SIGN_API_KEY?.trim() ||
+      process.env.TIKTOK_API_KEY?.trim() ||
+      process.env.EULERSTREAM_API_KEY?.trim() ||
       process.env.EULER_SIGN_API_KEY?.trim() ||
       process.env.SIGN_API_KEY?.trim() ||
-      "";
+      "2a04be678d4bd52e0e74dda9539cc73f20f4073685865c0558ff8a42246ac481";
 
-    const isDemoKey = (key: string) => !key || key.startsWith("euler_OTVjZTVkZTkwZjhlY2FhZjJmODEzYzY5ZGFiMTBjZTQxNzUyNzBjZjliMWFmZmQ5Njc5MzRm");
+    const isDemoKey = (key: string) => !key || key.startsWith("euler_OTVjZTVkZTkwZjhlY2FhZjJmODEzYzY5ZGFiMTBjZTQxNzUyNzBjZjliMWFmZmQ5Njc5MzRm") || key === "euler_...";
     const signApiKey = isDemoKey(rawSignApiKey) ? undefined : rawSignApiKey;
     const hasValidKey = Boolean(signApiKey);
 

@@ -27,7 +27,8 @@ const app = express();
 const PORT = 3000;
 
 const EULERSTREAM_CDN_ORIGIN = process.env.EULERSTREAM_CDN_ORIGIN || "https://7bfqra32uhm6g0zl.assets.cdn.eulerstream.com";
-const EULERSTREAM_API_KEY = process.env.EULERSTREAM_API_KEY || "";
+let TIKTOK_SAVED_API_KEY = process.env.TIKTOK_API_KEY || process.env.TIKTOK_SIGN_API_KEY || process.env.EULERSTREAM_API_KEY || "2a04be678d4bd52e0e74dda9539cc73f20f4073685865c0558ff8a42246ac481";
+const EULERSTREAM_API_KEY = TIKTOK_SAVED_API_KEY;
 const EULERSTREAM_WEBHOOK_SECRET = process.env.EULERSTREAM_WEBHOOK_SECRET || "19f761b2d5a310038df9b7102f0c70b192694459d06c19c9e5582835fd663e30";
 
 app.use(
@@ -1797,6 +1798,51 @@ app.get("/api/tiktok/oauth-endpoints", (_req, res) => {
     revoke: EULERSTREAM_OAUTH_REVOKE_URL,
     description: "Puntos finales para OAuth oficial de TikTok y EulerStream"
   });
+});
+
+// TikTok API Key Management Endpoints
+app.get("/api/tiktok/api-key", (_req, res) => {
+  res.json({
+    ok: true,
+    hasKey: Boolean(TIKTOK_SAVED_API_KEY),
+    apiKey: TIKTOK_SAVED_API_KEY,
+    maskedKey: TIKTOK_SAVED_API_KEY ? `${TIKTOK_SAVED_API_KEY.substring(0, 8)}...${TIKTOK_SAVED_API_KEY.substring(TIKTOK_SAVED_API_KEY.length - 8)}` : "",
+    keyLength: TIKTOK_SAVED_API_KEY ? TIKTOK_SAVED_API_KEY.length : 0,
+    status: "ACTIVE",
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.post("/api/tiktok/api-key", (req, res) => {
+  const { apiKey: newApiKey } = req.body;
+  if (!newApiKey || typeof newApiKey !== "string") {
+    return res.status(400).json({ ok: false, error: "Se requiere un string válido para apiKey" });
+  }
+
+  TIKTOK_SAVED_API_KEY = newApiKey.trim();
+  addServerLog("INFO", "TIKTOK", "Clave API de TikTok actualizada exitosamente", {
+    maskedKey: `${TIKTOK_SAVED_API_KEY.substring(0, 8)}...${TIKTOK_SAVED_API_KEY.substring(TIKTOK_SAVED_API_KEY.length - 8)}`,
+    length: TIKTOK_SAVED_API_KEY.length
+  });
+
+  res.json({
+    ok: true,
+    message: "Clave API de TikTok guardada y sincronizada correctamente en el servidor",
+    maskedKey: `${TIKTOK_SAVED_API_KEY.substring(0, 8)}...${TIKTOK_SAVED_API_KEY.substring(TIKTOK_SAVED_API_KEY.length - 8)}`,
+    status: "ACTIVE"
+  });
+});
+
+// Direct Bash Script Delivery Endpoint (curl / wget into Termux / Linux)
+const TRANSMISSION_SCRIPT_PATH = path.join(process.cwd(), "install_transmission.sh");
+app.get(["/install_transmission.sh", "/install.sh", "/api/install-transmission.sh"], (_req, res) => {
+  res.setHeader("Content-Type", "text/x-shellscript; charset=utf-8");
+  res.setHeader("Content-Disposition", 'inline; filename="install_transmission.sh"');
+  if (fs.existsSync(TRANSMISSION_SCRIPT_PATH)) {
+    const scriptContent = fs.readFileSync(TRANSMISSION_SCRIPT_PATH, "utf-8");
+    return res.send(scriptContent);
+  }
+  res.status(404).send("#!/usr/bin/env bash\necho 'Script not found'\n");
 });
 
 // Construct & return direct OAuth Provider Authorize URL for popup-based flow

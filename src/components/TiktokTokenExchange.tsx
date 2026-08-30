@@ -891,20 +891,23 @@ export function TiktokTokenExchange() {
             </div>
           </div>
 
-          {/* API Key EulerStream */}
+          {/* API Key TikTok / EulerStream */}
           <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-slate-400 font-medium">API Key EulerStream (Opcional):</span>
+              <span className="text-slate-400 font-medium flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span>Clave API TikTok / EulerStream (Activa):</span>
+              </span>
               <button
-                onClick={() => handleCopy("euler_live_production_key", "euler_api_key")}
-                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-bold cursor-pointer transition flex items-center gap-1"
+                onClick={() => handleCopy("2a04be678d4bd52e0e74dda9539cc73f20f4073685865c0558ff8a42246ac481", "tiktok_api_key")}
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-emerald-300 rounded text-[10px] font-bold cursor-pointer transition flex items-center gap-1"
               >
-                {copiedKey === "euler_api_key" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                {copiedKey === "tiktok_api_key" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                 <span>Copiar</span>
               </button>
             </div>
-            <div className="font-mono text-slate-400 text-[11px] bg-slate-950 p-2 rounded border border-slate-800 break-all select-all">
-              Configura tu clave personal en Ajustes o en el conector si cuentas con plan activo de EulerStream.
+            <div className="font-mono text-emerald-300 text-[11px] bg-slate-950 p-2 rounded border border-emerald-900/50 break-all select-all">
+              2a04be678d4bd52e0e74dda9539cc73f20f4073685865c0558ff8a42246ac481
             </div>
           </div>
 

@@ -20,9 +20,13 @@ export function TiktokLiveConnectorCard() {
   const [username, setUsername] = useState<string>("officialgeilegisela");
   const [customRoomId, setCustomRoomId] = useState<string>("");
   const [enableSimulation, setEnableSimulation] = useState<boolean>(true);
-  const [signApiKey, setSignApiKey] = useState<string>("");
+  const [signApiKey, setSignApiKey] = useState<string>("2a04be678d4bd52e0e74dda9539cc73f20f4073685865c0558ff8a42246ac481");
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
+  const [savedApiKeyInfo, setSavedApiKeyInfo] = useState<{ hasKey: boolean; maskedKey?: string } | null>({
+    hasKey: true,
+    maskedKey: "2a04be67...2246ac481"
+  });
   
   const [connectionStatus, setConnectionStatus] = useState<{
     isConnected: boolean;
@@ -65,12 +69,33 @@ export function TiktokLiveConnectorCard() {
     }
   }, []);
 
-  // Poll status periodically
+  const fetchApiKey = useCallback(async () => {
+    try {
+      const res = await fetch("/api/tiktok/api-key");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.hasKey) {
+          setSavedApiKeyInfo({
+            hasKey: true,
+            maskedKey: data.maskedKey || "2a04be67...2246ac481"
+          });
+          if (data.apiKey) {
+            setSignApiKey(data.apiKey);
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore
+    }
+  }, []);
+
+  // Poll status periodically and fetch API key on mount
   useEffect(() => {
     fetchStatus();
+    fetchApiKey();
     const interval = setInterval(fetchStatus, 4000);
     return () => clearInterval(interval);
-  }, [fetchStatus]);
+  }, [fetchStatus, fetchApiKey]);
 
   // Resilient WebSocket connection for realtime TikTok Live events
   const protocol = typeof window !== "undefined" && window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -272,11 +297,17 @@ export function TiktokLiveConnectorCard() {
             <Radio className="w-5 h-5 animate-pulse" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-sm font-bold text-white">TikTok LIVE Webcast Connector</h3>
               <span className="px-2 py-0.5 bg-pink-950 text-pink-400 font-mono text-[10px] rounded border border-pink-500/30">
                 Oficial Node.js Client
               </span>
+              {savedApiKeyInfo?.hasKey && (
+                <span className="px-2 py-0.5 bg-emerald-950/80 text-emerald-300 font-mono text-[10px] rounded border border-emerald-500/40 flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                  API Key: {savedApiKeyInfo.maskedKey || "2a04be67...2246ac481"}
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-slate-400">
               Conexión directa en tiempo real al chat, regalos, me gusta y eventos de cualquier streamer sin requerir credenciales del canal.
