@@ -31,6 +31,7 @@ import { AudienceEngagementStudio } from "./components/AudienceEngagementStudio"
 import { StartupHealthCheck } from "./components/StartupHealthCheck";
 import { GeminiTtsVoiceSettingsCard } from "./components/GeminiTtsVoiceSettingsCard";
 import { VoiceCommanderCard } from "./components/VoiceCommanderCard";
+import { MonitoringStudio } from "./components/MonitoringStudio";
 import { HectronLiveStudio } from "./components/HectronLiveStudio";
 import { LinuxSystemStudio } from "./components/LinuxSystemStudio";
 import { LinuxVMTab } from "./components/LinuxVMTab";
@@ -851,6 +852,18 @@ export default function App() {
               <Terminal className="w-4 h-4" />
               <span>Logs</span>
             </button>
+            
+            <button
+              onClick={() => setActiveTab("monitoring" as any)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                (activeTab as string) === "monitoring"
+                  ? "bg-rose-500 text-slate-950 shadow-md shadow-rose-500/20"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Activity className="w-4 h-4" />
+              <span>Monitoreo & Alertas</span>
+            </button>
 
             <button
               onClick={() => setActiveTab("linux")}
@@ -1579,6 +1592,8 @@ export default function App() {
         {activeTab === "livestudio" && <HectronLiveStudio />}
 
         {activeTab === "logs" && <LogsView />}
+        
+        {activeTab === "monitoring" && <MonitoringStudio />}
 
         {activeTab === "linux" && <LinuxVMTab />}
 

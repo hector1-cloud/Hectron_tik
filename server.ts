@@ -20,6 +20,7 @@ import {
   getLinuxFileContent,
   runLinuxDiagnostics,
 } from "./src/lib/linux-system";
+import { monitoringSystem } from "./src/lib/monitoring-server";
 
 dotenv.config();
 
@@ -183,8 +184,20 @@ function addServerLog(
   const prefix = `[${entry.timestamp}] [${level}] [${scope}]`;
   if (level === "ERROR") {
     console.error(prefix, message, details ? JSON.stringify(details) : "");
+    monitoringSystem.triggerAlert({
+      level: "error",
+      message: message,
+      source: scope,
+      details
+    });
   } else if (level === "WARN") {
     console.warn(prefix, message, details ? JSON.stringify(details) : "");
+    monitoringSystem.triggerAlert({
+      level: "warning",
+      message: message,
+      source: scope,
+      details
+    });
   } else {
     console.log(prefix, message, details ? JSON.stringify(details) : "");
   }
@@ -388,6 +401,25 @@ app.get("/hectron-streamer-studio*", (req, res) => {
 });
 
 // ================= API ENDPOINTS =================
+
+// Monitoring endpoints
+app.get("/api/monitoring/stats", (_req, res) => {
+  res.json({
+    ok: true,
+    stats: monitoringSystem.getStats(),
+    recentErrors: monitoringSystem.getRecentErrors(),
+    webhookUrl: monitoringSystem.getWebhookUrl()
+  });
+});
+
+app.post("/api/monitoring/webhook", (req, res) => {
+  const { url } = req.body;
+  if (typeof url !== "string") {
+    return res.status(400).json({ ok: false, error: "Invalid webhook URL" });
+  }
+  monitoringSystem.setWebhookUrl(url);
+  res.json({ ok: true, message: "Webhook URL updated successfully" });
+});
 
 // 1. Health check
 app.get("/api/health", (_req, res) => {
@@ -1670,7 +1702,7 @@ function generateCodeChallenge(verifier: string): string {
 // Helper to get correct TikTok Credentials from environment with fallback values
 function getTiktokCredentials() {
   return {
-    clientKey: process.env.TIKTOK_CLIENT_KEY || process.env.TIKTOK_CLIENT_ID || "9ed54f1a67da552fe7f77264dde6f26fe39da027a0b27f2897ada22a926a392a",
+    clientKey: TIKTOK_SAVED_API_KEY || process.env.TIKTOK_CLIENT_KEY || process.env.TIKTOK_CLIENT_ID || "awvckv5za3nclqpe",
     clientSecret: process.env.TIKTOK_CLIENT_SECRET || "zeolXlpUjS3Hsq4Xyl2shav-J19hHZwgUbhyGHX15_ws9nEV3k8X5LbdshW1aB55"
   };
 }
@@ -2546,7 +2578,7 @@ app.get(["/api/tiktok/callback", "/callback", "/api/auth/callback", "/auth/callb
               <a href="/api/tiktok/login?provider=eulerstream" class="btn btn-primary">
                 ⚡ Conectar vía EulerStream OAuth
               </a>
-              <a href="/?tab=tiktok&subtab=live" onclick="if(window.opener){window.opener.postMessage({type:'SWITCH_TAB',tab:'tiktok',subtab:'live'},'*');window.close();}" class="btn btn-secondary">
+              <a href="/?tab=tiktok&subtab=live" onclick="if(window.opener){try{window.opener.postMessage({type:'SWITCH_TAB',tab:'tiktok',subtab:'live'},'*');}catch(e){}}window.close();" class="btn btn-secondary">
                 🎙️ Usar Webcast Push LIVE (Sin Claves)
               </a>
               <a href="/api/tiktok/login?mode=sandbox" class="btn btn-outline">
@@ -2555,8 +2587,12 @@ app.get(["/api/tiktok/callback", "/callback", "/api/auth/callback", "/auth/callb
             </div>
           </div>
           <script>
-            if (window.opener) {
-              window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', error: ${JSON.stringify(errorMsg)} }, '*');
+            try {
+              if (window.opener) {
+                window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', error: ${JSON.stringify(errorMsg)} }, '*');
+              }
+            } catch(e) {
+              console.warn("PostMessage blocked:", e);
             }
           </script>
         </body>
@@ -2669,17 +2705,22 @@ app.get(["/api/tiktok/callback", "/callback", "/api/auth/callback", "/auth/callb
           <p>Autenticación completada. Sincronizando con HECTRON Streamer Studio...</p>
         </div>
         <script>
-          if (window.opener) {
-            window.opener.postMessage({
-              type: 'OAUTH_AUTH_SUCCESS',
-              provider: 'tiktok',
-              roomId: ${JSON.stringify(brainState.roomId)},
-              openId: ${JSON.stringify(openId)},
-              realExchangeSuccess: ${Boolean(realExchangeSuccess)}
-            }, '*');
+          try {
+            if (window.opener) {
+              window.opener.postMessage({
+                type: 'OAUTH_AUTH_SUCCESS',
+                provider: 'tiktok',
+                roomId: ${JSON.stringify(brainState.roomId)},
+                openId: ${JSON.stringify(openId)},
+                realExchangeSuccess: ${Boolean(realExchangeSuccess)}
+              }, '*');
+              setTimeout(() => window.close(), 600);
+            } else {
+              window.location.href = '/?tiktok_success=true';
+            }
+          } catch(e) {
+            console.warn("PostMessage blocked:", e);
             setTimeout(() => window.close(), 600);
-          } else {
-            window.location.href = '/?tiktok_success=true';
           }
         </script>
       </body>

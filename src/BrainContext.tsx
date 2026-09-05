@@ -74,6 +74,7 @@ export function BrainProvider({ children }: { children: ReactNode }) {
     | "linux"
     | "studio3d"
     | "analytics"
+    | "monitoring"
   >("dashboard");
 
   // LOD & FPS state for 3D optimization

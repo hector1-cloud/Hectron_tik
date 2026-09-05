@@ -271,8 +271,8 @@ export interface BrainContextType {
   messages: ChatMessage[];
   addMessage: (msg: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
   clearMessages: () => void;
-  activeTab: 'dashboard' | 'game' | 'inventory' | 'saves' | 'achievements' | 'profiles' | 'engagement' | 'overlay' | 'agent' | 'tiktok' | 'duix' | 'streamerbot' | 'logs' | 'performance' | 'autonomy' | 'workers-ai' | 'workflows' | 'executive' | 'enterprise' | 'sims' | 'livestudio' | 'linux' | 'studio3d' | 'analytics';
-  setActiveTab: (tab: 'dashboard' | 'game' | 'inventory' | 'saves' | 'achievements' | 'profiles' | 'engagement' | 'overlay' | 'agent' | 'tiktok' | 'duix' | 'streamerbot' | 'logs' | 'performance' | 'autonomy' | 'workers-ai' | 'workflows' | 'executive' | 'enterprise' | 'sims' | 'livestudio' | 'linux' | 'studio3d' | 'analytics') => void;
+  activeTab: 'dashboard' | 'game' | 'inventory' | 'saves' | 'achievements' | 'profiles' | 'engagement' | 'overlay' | 'agent' | 'tiktok' | 'duix' | 'streamerbot' | 'logs' | 'performance' | 'autonomy' | 'workers-ai' | 'workflows' | 'executive' | 'enterprise' | 'sims' | 'livestudio' | 'linux' | 'studio3d' | 'analytics' | 'monitoring';
+  setActiveTab: (tab: 'dashboard' | 'game' | 'inventory' | 'saves' | 'achievements' | 'profiles' | 'engagement' | 'overlay' | 'agent' | 'tiktok' | 'duix' | 'streamerbot' | 'logs' | 'performance' | 'autonomy' | 'workers-ai' | 'workflows' | 'executive' | 'enterprise' | 'sims' | 'livestudio' | 'linux' | 'studio3d' | 'analytics' | 'monitoring') => void;
   speakText: (text: string, emotion?: Emotion, customAnimation?: AvatarAnimationClass, customVoiceConfig?: Partial<TtsVoiceSettings>) => Promise<void>;
   latestSpeechText: string;
   isSpeaking: boolean;
